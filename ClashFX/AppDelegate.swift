@@ -283,10 +283,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.statusItemView.showSpeedContainer(show: show ?? true)
             }.disposed(by: disposeBag)
 
-        statusItemView.updateViewStatus(enableProxy: ConfigManager.shared.proxyPortAutoSet)
+        refreshStatusItemViewStatus()
         enhancedModeMenuItem.state = Settings.enhancedMode ? .on : .off
         installSubscriptionStatusMenuItemIfNeeded()
         refreshSubscriptionStatusMenuItem()
+    }
+
+    private func refreshStatusItemViewStatus(systemProxyActive: Bool? = nil) {
+        let activeSystemProxy = systemProxyActive ?? (
+            ConfigManager.shared.proxyPortAutoSet &&
+                !ConfigManager.shared.isProxySetByOtherVariable.value &&
+                !ConfigManager.shared.proxyShouldPaused.value
+        )
+        statusItemView.updateViewStatus(enableProxy: activeSystemProxy || ConfigManager.shared.isEnhancedModeActive)
     }
 
     private func installSubscriptionStatusMenuItemIfNeeded() {
@@ -348,7 +357,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .bind { [weak self] status in
                 guard let self = self else { return }
                 self.proxySettingMenuItem.state = status
-                self.statusItemView.updateViewStatus(enableProxy: status == .on)
+                self.refreshStatusItemViewStatus(systemProxyActive: status == .on)
             }.disposed(by: disposeBag)
 
         let configObservable = ConfigManager.shared
@@ -851,6 +860,7 @@ extension AppDelegate {
                             ConfigManager.shared.apiPort = port
                             ConfigManager.shared.apiSecret = secret
                             ConfigManager.shared.isEnhancedModeActive = true
+                            self?.refreshStatusItemViewStatus()
                             self?.waitForExternalCore(port: port, secret: secret, retriesLeft: 10) { success in
                                 if success {
                                     clashResumeCallbacks()
@@ -863,6 +873,7 @@ extension AppDelegate {
                                         DispatchQueue.main.async {
                                             ConfigManager.shared.isEnhancedModeActive = false
                                             ConfigManager.shared.isRunning = false
+                                            self?.refreshStatusItemViewStatus()
                                             clashReopenCacheDB()
                                             clashResumeCallbacks()
                                             self?.startProxy()
@@ -884,18 +895,30 @@ extension AppDelegate {
         if !secret.isEmpty {
             request.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
         }
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession.shared.dataTask(with: request) { data, response, _ in
             DispatchQueue.main.async {
-                if let http = response as? HTTPURLResponse, http.statusCode == 200 {
-                    Logger.log("External core API ready on port \(port)")
+                // mihomo's REST server can answer /configs while listeners are still being created,
+                // returning port=0. Require port>0 so the GUI never observes that transient.
+                let listenersUp: Bool = {
+                    guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                          let data = data,
+                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    else { return false }
+                    let mixed = (json["mixed-port"] as? NSNumber)?.intValue ?? 0
+                    let httpPort = (json["port"] as? NSNumber)?.intValue ?? 0
+                    return mixed > 0 || httpPort > 0
+                }()
+
+                if listenersUp {
+                    Logger.log("External core API + listeners ready on port \(port)")
                     ready(true)
                 } else if retriesLeft > 0 {
-                    Logger.log("Waiting for external core (\(retriesLeft) retries left)...", level: .debug)
+                    Logger.log("Waiting for external core listeners (\(retriesLeft) retries left)...", level: .debug)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                         self?.waitForExternalCore(port: port, secret: secret, retriesLeft: retriesLeft - 1, ready: ready)
                     }
                 } else {
-                    Logger.log("External core API not responding after all retries", level: .error)
+                    Logger.log("External core listeners not ready after all retries", level: .error)
                     ready(false)
                 }
             }
@@ -921,6 +944,7 @@ extension AppDelegate {
             clashPauseCallbacks()
             ConfigManager.shared.isEnhancedModeActive = false
             ConfigManager.shared.isRunning = false
+            self?.refreshStatusItemViewStatus()
             clashReopenCacheDB()
             self?.startProxy()
             guard ConfigManager.shared.isRunning else {

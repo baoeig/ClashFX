@@ -84,17 +84,83 @@ class ApiRequest {
     }
 
     static func requestConfig(completeHandler: @escaping ((ClashConfig) -> Void)) {
-        if !useDirectApi() {
+        requestConfigWithRetry(
+            context: RequestConfigContext.current,
+            retriesLeft: 5,
+            delay: 0.2,
+            completeHandler: completeHandler
+        )
+    }
+
+    private struct RequestConfigContext: Equatable {
+        let directApi: Bool
+        let apiUrl: String
+        let selectedConfig: String
+
+        static var current: RequestConfigContext {
+            RequestConfigContext(
+                directApi: ApiRequest.useDirectApi(),
+                apiUrl: ConfigManager.apiUrl,
+                selectedConfig: ConfigManager.selectConfigName
+            )
+        }
+    }
+
+    private static func requestConfigWithRetry(
+        context: RequestConfigContext,
+        retriesLeft: Int,
+        delay: TimeInterval,
+        completeHandler: @escaping ((ClashConfig) -> Void)
+    ) {
+        let retry: (String) -> Void = { reason in
+            guard context == RequestConfigContext.current else {
+                Logger.log("requestConfig: context changed during retry, reissuing", level: .warning)
+                requestConfig(completeHandler: completeHandler)
+                return
+            }
+            guard retriesLeft > 0 else {
+                Logger.log("requestConfig: gave up after retries, \(reason)", level: .warning)
+                return
+            }
+            Logger.log("requestConfig: \(reason), retrying in \(delay)s (\(retriesLeft) left)", level: .warning)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                requestConfigWithRetry(
+                    context: context,
+                    retriesLeft: retriesLeft - 1,
+                    delay: min(delay * 1.8, 2.0),
+                    completeHandler: completeHandler
+                )
+            }
+        }
+
+        let dispatch: (ClashConfig) -> Void = { config in
+            guard context == RequestConfigContext.current else {
+                Logger.log("requestConfig: context changed before completion, reissuing", level: .warning)
+                requestConfig(completeHandler: completeHandler)
+                return
+            }
+            if config.usedHttpPort > 0 || retriesLeft <= 0 {
+                if config.usedHttpPort == 0 {
+                    Logger.log("requestConfig: gave up after retries, port still 0", level: .warning)
+                }
+                completeHandler(config)
+                return
+            }
+            retry("port=0 transient")
+        }
+
+        if !context.directApi {
             req("/configs").responseDecodable(of: ClashConfig.self) {
                 resp in
                 switch resp.result {
                 case let .success(config):
-                    completeHandler(config)
+                    dispatch(config)
                 case let .failure(err):
                     Logger.log("requestConfig: \(err.localizedDescription)")
-                    if ConfigManager.shared.isRunning, !ConfigManager.shared.isEnhancedModeActive {
+                    if ConfigManager.shared.isRunning, !ConfigManager.shared.isEnhancedModeActive, retriesLeft <= 0 {
                         NSUserNotificationCenter.default.post(title: "Error", info: err.localizedDescription)
                     }
+                    retry(err.localizedDescription)
                 }
             }
             return
@@ -108,7 +174,7 @@ class ApiRequest {
                     (NSApplication.shared.delegate as? AppDelegate)?.startProxy()
                     return
                 }
-                completeHandler(config)
+                dispatch(config)
             }
         }
     }
