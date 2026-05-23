@@ -1,12 +1,22 @@
+### New Features
+
+- **Built-in App Icons** — Appearance settings now include selectable built-in ClashFX app icons, with a Default option and custom uploads still supported.
+- **Persistent Release App Icon Switching** — Release app bundles can persist Finder/Dock icon changes while Xcode/DerivedData builds stay session-only to avoid signing damage.
+
 ### Bug Fixes
 
-- **Enhanced Mode Startup Readiness Hardened** — Enhanced Mode now waits until `/configs` reports a usable `mixed-port` or `port` before treating the external mihomo core as ready, avoiding the misleading "Ports Open Fail" popup when mihomo is already listening. (#75)
-- **Transient Port-Zero Retry** — ClashFX now retries `/configs` responses that temporarily report `port=0`, and reissues the request if the active API/config context changes during the retry window. (#75)
-- **Enhanced Mode Tray Highlight** — The menu bar icon now lights up when Enhanced Mode is active, even if the system proxy toggle is off. (#75)
+- **Enhanced Mode Uses the Selected Config Path** — Enhanced Mode now resolves the active config through the same path logic as the rest of the app, including iCloud fallback handling.
+- **Custom Icon Uploads Normalize to PNG** — Uploaded app icon images are converted to PNG before saving, avoiding mismatched file contents when users choose ICNS or other supported image formats.
+- **Web Cache Cleanup Moved Off Main Thread** — Cookie and WebKit data cleanup now runs on a utility queue to avoid blocking startup UI work.
 
 ---
+### 新功能
+
+- **内置应用图标** — 外观设置现在提供多款内置 ClashFX 应用图标可选，同时保留默认图标和自定义上传。
+- **Release 版应用图标持久切换** — Release app bundle 可以持久保存 Finder/Dock 图标变化；从 Xcode/DerivedData 运行时只做当前会话更新，避免破坏签名。
+
 ### 修复
 
-- **增强模式启动就绪判断加固** — 增强模式现在会等待 `/configs` 返回可用的 `mixed-port` 或 `port` 后才认为外部 mihomo core 已就绪，避免 mihomo 已经监听端口时仍误弹“端口打开失败”。（#75）
-- **临时 port=0 自动重试** — ClashFX 现在会对 `/configs` 短暂返回 `port=0` 的情况进行退避重试；如果重试期间 API/配置上下文发生变化，会自动按最新上下文重新请求。（#75）
-- **增强模式图标高亮** — 菜单栏图标现在会在增强模式启用时变亮，不再必须开启“系统代理”才高亮。（#75）
+- **增强模式使用当前选中配置路径** — 增强模式现在通过与 App 其他部分一致的路径逻辑解析当前配置，并处理 iCloud 路径不可用时的本地回退。
+- **自定义图标上传统一保存为 PNG** — 上传应用图标时会先转换为 PNG 再保存，避免选择 ICNS 或其他支持格式时出现内容与文件扩展名不匹配。
+- **Web 缓存清理移出主线程** — Cookie 和 WebKit 数据清理现在在 utility 队列执行，避免阻塞启动阶段 UI 工作。
