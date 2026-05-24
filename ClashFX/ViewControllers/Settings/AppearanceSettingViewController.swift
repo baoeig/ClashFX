@@ -9,7 +9,7 @@ import Cocoa
 
 class AppearanceSettingViewController: NSViewController {
     private let trayMenuSettingViewHeight: CGFloat = 300
-    private let preferredViewportHeight: CGFloat = 560
+    private let preferredViewportHeight: CGFloat = 720
 
     override func loadView() {
         let width: CGFloat = 400
@@ -22,7 +22,7 @@ class AppearanceSettingViewController: NSViewController {
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
+        scrollView.autohidesScrollers = false
 
         let documentView = NSView()
         documentView.translatesAutoresizingMaskIntoConstraints = false
@@ -92,7 +92,6 @@ class AppearanceSettingViewController: NSViewController {
             documentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
             documentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
             documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
-            documentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.contentView.heightAnchor),
 
             trayBox.topAnchor.constraint(equalTo: documentView.topAnchor, constant: 18),
             trayBox.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 20),

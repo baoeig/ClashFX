@@ -9,7 +9,6 @@
 import Cocoa
 
 class SettingTabViewController: NSTabViewController, NibLoadable {
-    private let segmentedControlTopPadding: CGFloat = 12
     private let windowScreenPadding: CGFloat = 80
 
     override func viewDidLoad() {
@@ -25,11 +24,6 @@ class SettingTabViewController: NSTabViewController, NibLoadable {
         configureTabIcons()
         insertAppearanceTab()
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    override func viewDidLayout() {
-        super.viewDidLayout()
-        adjustSegmentedControlPosition()
     }
 
     private func configureTabIcons() {
@@ -81,22 +75,12 @@ class SettingTabViewController: NSTabViewController, NibLoadable {
         if let visibleFrame = window.screen?.visibleFrame, frame.minY < visibleFrame.minY + 12 {
             frame.origin.y = visibleFrame.minY + 12
         }
-        window.setFrame(frame, display: true, animate: true)
+        window.setFrame(frame, display: true, animate: false)
     }
 
     private func maximumContentHeight(for window: NSWindow) -> CGFloat {
         guard let visibleFrame = window.screen?.visibleFrame else { return 620 }
         return max(360, visibleFrame.height - windowScreenPadding)
-    }
-
-    private func adjustSegmentedControlPosition() {
-        guard #available(macOS 15, *), tabStyle == .segmentedControlOnTop,
-              let contentView = view.window?.contentView,
-              let segmentedControl = contentView.firstSubview(ofType: NSSegmentedControl.self) else { return }
-
-        let targetY = contentView.bounds.maxY - segmentedControl.frame.height - segmentedControlTopPadding
-        guard abs(segmentedControl.frame.origin.y - targetY) > 0.5 else { return }
-        segmentedControl.frame.origin.y = targetY
     }
 
     private func insertAppearanceTab() {
@@ -109,19 +93,5 @@ class SettingTabViewController: NSTabViewController, NibLoadable {
             item.image = makeFallbackIcon(glyph: "🎨")
         }
         insertTabViewItem(item, at: 1)
-    }
-}
-
-private extension NSView {
-    func firstSubview<T: NSView>(ofType type: T.Type) -> T? {
-        for subview in subviews {
-            if let match = subview as? T {
-                return match
-            }
-            if let match = subview.firstSubview(ofType: type) {
-                return match
-            }
-        }
-        return nil
     }
 }
