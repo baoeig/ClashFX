@@ -508,11 +508,12 @@
 
 /* Menu bar icon picker */
 "Built-in menu bar icons" = "内蔵メニューバーアイコン";
-"Lightning Cat" = "案 1: 稲妻猫";
-"Network Nodes" = "案 2: ノードネットワーク";
-"Linked Nodes" = "案 2: リンクノード";
-"Shield Cat" = "案 3: シールド猫";
-"Bolt Outline" = "案 4: 稲妻アウトライン";
+"Lightning Cat" = "稲妻猫";
+"Network Nodes" = "ノードネットワーク";
+"Shield Cat" = "シールド猫";
+"Bolt Outline" = "稲妻アウトライン";
+"Outline Face Cat" = "アウトライン猫顔";
+"Filled Face Cat" = "塗り猫顔";
 
 /* Advanced TUN Settings */
 "Advanced TUN Settings…" = "TUN 詳細設定…";

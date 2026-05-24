@@ -510,9 +510,10 @@
 "Built-in menu bar icons" = "Built-in menu bar icons";
 "Lightning Cat" = "Lightning Cat";
 "Network Nodes" = "Network Nodes";
-"Linked Nodes" = "Linked Nodes";
 "Shield Cat" = "Shield Cat";
 "Bolt Outline" = "Bolt Outline";
+"Outline Face Cat" = "Outline Cat Face";
+"Filled Face Cat" = "Solid Cat Face";
 
 /* Advanced TUN Settings */
 "Advanced TUN Settings…" = "Advanced TUN Settings…";

@@ -508,11 +508,12 @@
 
 /* Menu bar icon picker */
 "Built-in menu bar icons" = "Встроенные значки меню";
-"Lightning Cat" = "Вариант 1: кот-молния";
-"Network Nodes" = "Вариант 2: сетевые узлы";
-"Linked Nodes" = "Вариант 2: связанные узлы";
-"Shield Cat" = "Вариант 3: кот-щит";
-"Bolt Outline" = "Вариант 4: контур молнии";
+"Lightning Cat" = "Кот-молния";
+"Network Nodes" = "Сетевые узлы";
+"Shield Cat" = "Кот-щит";
+"Bolt Outline" = "Контур молнии";
+"Outline Face Cat" = "Контур морды кота";
+"Filled Face Cat" = "Силуэт морды кота";
 
 /* Advanced TUN Settings */
 "Advanced TUN Settings…" = "Расширенные настройки TUN…";
