@@ -20,9 +20,10 @@ enum StatusItemTool {
     static let customImagePath = (NSHomeDirectory() as NSString).appendingPathComponent("/.config/clashfx/menuImage.png")
 
     static let builtInMenuIcons: [BuiltInMenuIcon] = [
+        BuiltInMenuIcon(id: "cat-outline-face", title: NSLocalizedString("Outline Face Cat", comment: ""), resourceName: "menu-cat-outline-face"),
+        BuiltInMenuIcon(id: "cat-filled-face", title: NSLocalizedString("Filled Face Cat", comment: ""), resourceName: "menu-cat-filled-face"),
         BuiltInMenuIcon(id: "cat-lightning-solid", title: NSLocalizedString("Lightning Cat", comment: ""), resourceName: "menu-cat-lightning-solid"),
         BuiltInMenuIcon(id: "cat-network", title: NSLocalizedString("Network Nodes", comment: ""), resourceName: "menu-cat-network"),
-        BuiltInMenuIcon(id: "cat-link", title: NSLocalizedString("Linked Nodes", comment: ""), resourceName: "menu-cat-link"),
         BuiltInMenuIcon(id: "cat-shield", title: NSLocalizedString("Shield Cat", comment: ""), resourceName: "menu-cat-shield"),
         BuiltInMenuIcon(id: "cat-lightning-outline", title: NSLocalizedString("Bolt Outline", comment: ""), resourceName: "menu-cat-lightning-outline")
     ]
