@@ -207,7 +207,7 @@ jobs:
           <pubDate>{pub_date}</pubDate>
           <sparkle:version>{tag}</sparkle:version>
           <sparkle:shortVersionString>{tag}</sparkle:shortVersionString>
-{channel_tag}          <sparkle:minimumSystemVersion>10.14</sparkle:minimumSystemVersion>
+          {channel_tag}          <sparkle:minimumSystemVersion>10.14</sparkle:minimumSystemVersion>
           <enclosure
             url="https://github.com/Clash-FX/ClashFX/releases/download/{tag}/ClashFX.dmg"
             sparkle:version="{tag}"
