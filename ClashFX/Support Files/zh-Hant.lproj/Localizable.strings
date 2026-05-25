@@ -419,7 +419,7 @@
 "Drag and drop an image to customize the app icon.\nRecommended: 512x512 px (1024x1024 for @2x), PNG or ICNS format." = "拖曳圖片到此處自訂應用圖示。\n建議尺寸：512×512 像素（@2x 為 1024×1024），PNG 或 ICNS 格式。";
 
 /* Tray Menu Settings */
-"Tray Menu" = "托盤選單";
+"Tray Menu" = "選單列選單";
 
 /* No comment provided by engineer. */
 "Node Switch" = "節點切換";
@@ -488,7 +488,7 @@
 "Config Switcher" = "配置切換";
 
 /* Tray Menu Settings hint */
-"Show or hide items in the tray menu." = "選擇托盤選單中各項目的顯示與隱藏";
+"Show or hide items in the tray menu." = "選擇選單列選單中各項目的顯示與隱藏";
 
 /* App icon picker */
 "Built-in app icons" = "內置 APP 圖示";
