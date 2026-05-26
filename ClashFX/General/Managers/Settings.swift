@@ -41,6 +41,54 @@ enum Settings {
     @UserDefault("tunRouteExcludeRawText", defaultValue: "")
     static var tunRouteExcludeRawText: String
 
+    static func normalizeTunRouteExcludeEntries(_ entries: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for entry in entries {
+            let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let normalized = legacyWildcardTunRouteExcludeEntry(trimmed) ?? trimmed
+            guard seen.insert(normalized).inserted else { continue }
+            result.append(normalized)
+        }
+        return result
+    }
+
+    static func normalizeAndPersistTunRouteExcludeList() -> [String] {
+        let rawEntries = tunRouteExcludeRawText
+            .components(separatedBy: CharacterSet(charactersIn: ",\n\r"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let source = rawEntries.isEmpty ? tunRouteExcludeList : rawEntries
+        let normalized = normalizeTunRouteExcludeEntries(source)
+        if normalized != tunRouteExcludeList {
+            tunRouteExcludeList = normalized
+        }
+        if !rawEntries.isEmpty && normalized != rawEntries {
+            tunRouteExcludeRawText = normalized.joined(separator: ",\n")
+        }
+        return normalized
+    }
+
+    private static func legacyWildcardTunRouteExcludeEntry(_ entry: String) -> String? {
+        if entry == "10.*" {
+            return "10.0.0.0/8"
+        }
+        if entry == "192.168.*" {
+            return "192.168.0.0/16"
+        }
+        guard entry.hasPrefix("172."), entry.hasSuffix(".*") else {
+            return nil
+        }
+        let components = entry.split(separator: ".")
+        guard components.count == 3,
+              let secondOctet = Int(components[1]),
+              (16 ... 31).contains(secondOctet) else {
+            return nil
+        }
+        return "172.\(secondOctet).0.0/16"
+    }
+
     static let defaultTunMTU = 1500
     static let minTunMTU = 1280
     static let maxTunMTU = 9000

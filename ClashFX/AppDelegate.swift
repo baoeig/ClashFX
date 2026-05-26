@@ -1059,7 +1059,7 @@ extension AppDelegate {
                 let writeResult = clashWriteEnhancedConfig(
                     selectedConfigPath.goStringBuffer(),
                     tempConfigPath.goStringBuffer(),
-                    Settings.tunRouteExcludeList.joined(separator: ",").goStringBuffer(),
+                    Settings.normalizeAndPersistTunRouteExcludeList().joined(separator: ",").goStringBuffer(),
                     GoUint32(Settings.tunMTU),
                     Settings.tunInterfaceName.goStringBuffer(),
                     Settings.bypassChineseApps ? 1 : 0

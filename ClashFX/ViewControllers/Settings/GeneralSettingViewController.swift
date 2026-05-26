@@ -35,8 +35,9 @@ class GeneralSettingViewController: NSViewController {
         speedTestUrlField.stringValue = Settings.benchMarkUrl
         speedTestUrlField.placeholderString = Settings.defaultBenchmarkUrl
         ignoreListTextView.string = Settings.proxyIgnoreList.joined(separator: ",")
+        let tunRouteExcludes = Settings.normalizeAndPersistTunRouteExcludeList()
         tunRouteExcludeTextView.string = Settings.tunRouteExcludeRawText.isEmpty
-            ? Settings.tunRouteExcludeList.joined(separator: ",\n")
+            ? tunRouteExcludes.joined(separator: ",\n")
             : Settings.tunRouteExcludeRawText
         ignoreListTextView.rx
             .string.debounce(.milliseconds(500), scheduler: MainScheduler.instance)
@@ -53,7 +54,11 @@ class GeneralSettingViewController: NSViewController {
                     .components(separatedBy: CharacterSet(charactersIn: ",\n\r"))
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty }
-                Settings.tunRouteExcludeList = arr
+                let normalized = Settings.normalizeTunRouteExcludeEntries(arr)
+                if normalized != arr {
+                    Settings.tunRouteExcludeRawText = normalized.joined(separator: ",\n")
+                }
+                Settings.tunRouteExcludeList = normalized
             }.disposed(by: disposeBag)
 
         ssidSuspendTextField.string = Settings.disableSSIDList.joined(separator: ",")

@@ -136,7 +136,35 @@ func parseEntryAsPrefix(s string) (netip.Prefix, bool) {
 		}
 		return netip.PrefixFrom(ip, bits), true
 	}
+	if prefix, ok := legacyWildcardTunRouteExcludePrefix(s); ok {
+		return prefix, true
+	}
 	return netip.Prefix{}, false
+}
+
+func legacyWildcardTunRouteExcludePrefix(s string) (netip.Prefix, bool) {
+	switch s {
+	case "10.*":
+		prefix, _ := netip.ParsePrefix("10.0.0.0/8")
+		return prefix, true
+	case "192.168.*":
+		prefix, _ := netip.ParsePrefix("192.168.0.0/16")
+		return prefix, true
+	}
+
+	if !strings.HasPrefix(s, "172.") || !strings.HasSuffix(s, ".*") {
+		return netip.Prefix{}, false
+	}
+	parts := strings.Split(s, ".")
+	if len(parts) != 3 {
+		return netip.Prefix{}, false
+	}
+	secondOctet, err := strconv.Atoi(parts[1])
+	if err != nil || secondOctet < 16 || secondOctet > 31 {
+		return netip.Prefix{}, false
+	}
+	prefix, _ := netip.ParsePrefix(fmt.Sprintf("172.%d.0.0/16", secondOctet))
+	return prefix, true
 }
 
 func isTunFakeIPFilterEntry(s string) bool {
