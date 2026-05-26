@@ -70,6 +70,7 @@ class ApiRequest {
     private var loggingWebSocketRetryDelay: TimeInterval = 1
     private var trafficWebSocketRetryTimer: Timer?
     private var loggingWebSocketRetryTimer: Timer?
+    private static let maxRetryDelaySeconds: TimeInterval = 64
 
     private var alamoFireManager: Session
 
@@ -566,34 +567,44 @@ extension ApiRequest: WebSocketDelegate {
     }
 
     func websocketDidDisconnect(socket: WebSocketClient, error: Error?) {
-        guard let err = error else {
-            return
+        if let err = error {
+            Logger.log(err.localizedDescription, level: .error)
         }
-
-        Logger.log(err.localizedDescription, level: .error)
 
         guard let webSocket = socket as? WebSocket else { return }
 
-        if webSocket == trafficWebSocket {
-            Logger.log("trafficWebSocket did disconnect", level: .debug)
-            trafficWebSocketRetryTimer?.invalidate()
-            trafficWebSocketRetryTimer =
-                Timer.scheduledTimer(withTimeInterval: trafficWebSocketRetryDelay, repeats: false, block: {
-                    [weak self] _ in
-                    if self?.trafficWebSocket?.isConnected == true { return }
-                    self?.requestTrafficInfo()
-                })
-            trafficWebSocketRetryDelay *= 2
+        let errDesc = error?.localizedDescription ?? "clean"
+        if webSocket === trafficWebSocket {
+            Logger.log("trafficWebSocket did disconnect (\(errDesc))", level: .debug)
+            scheduleTrafficRetry()
+        } else if webSocket === loggingWebSocket {
+            Logger.log("loggingWebSocket did disconnect (\(errDesc))", level: .debug)
+            scheduleLogRetry()
         } else {
-            Logger.log("loggingWebSocket did disconnect", level: .debug)
-            loggingWebSocketRetryTimer =
-                Timer.scheduledTimer(withTimeInterval: loggingWebSocketRetryDelay, repeats: false, block: {
-                    [weak self] _ in
-                    if self?.loggingWebSocket?.isConnected == true { return }
-                    self?.requestLog()
-                })
-            loggingWebSocketRetryDelay *= 2
+            Logger.log("stale websocket disconnect ignored (\(errDesc))", level: .debug)
         }
+    }
+
+    private func scheduleTrafficRetry() {
+        trafficWebSocketRetryTimer?.invalidate()
+        trafficWebSocketRetryTimer = Timer.scheduledTimer(
+            withTimeInterval: trafficWebSocketRetryDelay, repeats: false
+        ) { [weak self] _ in
+            if self?.trafficWebSocket?.isConnected == true { return }
+            self?.requestTrafficInfo()
+        }
+        trafficWebSocketRetryDelay = min(trafficWebSocketRetryDelay * 2, Self.maxRetryDelaySeconds)
+    }
+
+    private func scheduleLogRetry() {
+        loggingWebSocketRetryTimer?.invalidate()
+        loggingWebSocketRetryTimer = Timer.scheduledTimer(
+            withTimeInterval: loggingWebSocketRetryDelay, repeats: false
+        ) { [weak self] _ in
+            if self?.loggingWebSocket?.isConnected == true { return }
+            self?.requestLog()
+        }
+        loggingWebSocketRetryDelay = min(loggingWebSocketRetryDelay * 2, Self.maxRetryDelaySeconds)
     }
 
     func websocketDidReceiveMessage(socket: WebSocketClient, text: String) {
