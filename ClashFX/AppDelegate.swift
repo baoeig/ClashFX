@@ -17,7 +17,7 @@ import RxCocoa
 import RxSwift
 import Yams
 
-let statusItemLengthWithSpeed: CGFloat = 72
+let statusItemLengthWithSpeed: CGFloat = 88
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {

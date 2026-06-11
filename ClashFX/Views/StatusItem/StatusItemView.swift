@@ -83,21 +83,20 @@ class StatusItemView: NSView, StatusItemViewProtocol {
 
     func updateSpeedLabel(up: Int, down: Int) {
         guard !speedContainerView.isHidden else { return }
-        var needsResize = false
+        var needsRedraw = false
         if up != self.up {
             self.up = up
-            needsResize = true
+            needsRedraw = true
         }
         if down != self.down {
             self.down = down
-            needsResize = true
+            needsRedraw = true
         }
-        if needsResize {
+        if needsRedraw {
             speedTextView.update(
                 up: SpeedUtils.getSpeedString(for: up),
                 down: SpeedUtils.getSpeedString(for: down)
             )
-            updateDynamicWidth()
         }
     }
 
@@ -105,19 +104,5 @@ class StatusItemView: NSView, StatusItemViewProtocol {
         speedContainerView.isHidden = !show
         speedLeadingConstraint?.isActive = show
         collapsedSpeedWidthConstraint?.isActive = !show
-    }
-
-    private func updateDynamicWidth() {
-        guard !speedContainerView.isHidden else { return }
-        let maxTextWidth = speedTextView.textWidth
-
-        // leading(3) + icon(18) + gap(8) + text + trailing(3)
-        let neededWidth = 32.0 + maxTextWidth
-        let width = max(statusItemLengthWithSpeed, neededWidth)
-
-        if abs(frame.width - width) > 0.5 {
-            updateSize(width: width)
-            statusItem?.length = width
-        }
     }
 }
