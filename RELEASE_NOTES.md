@@ -1,24 +1,24 @@
 ### Bug Fixes
 
-- **Menu Bar Speed Indicator No Longer Shakes** — The upload/download speed text now redraws inside a stable menu bar item width instead of resizing the whole status item whenever the number of digits changes, so nearby menu bar icons no longer jump when speeds cross values like `9.xx` → `10.xx`. (#122)
-- **Enhanced Mode Restore Is More Reliable After Restart** — When ClashFX launches with Enhanced Mode previously enabled, it now retries the restore flow for up to about one minute while the privileged helper and external core come online. This avoids giving up after a single early attempt during app or macOS startup. (#123)
+- **Menu Bar Status Item Uses Less Space** — The upload/download speed indicator now sizes the macOS menu bar item from the actual rendered speed text instead of reserving a wide fixed block, keeping ClashFX compact in crowded menu bars while still expanding when longer speeds need room. (#127)
+- **Enhanced Mode Toggle No Longer Rebuilds the Menu Immediately** — After enabling or disabling Enhanced Mode, ClashFX now coalesces and slightly delays the config/stream/proxy-menu refresh work so quickly reopening the menu does not visibly freeze or flash during the toggle completion. (#125)
 
 ### Contributors
 
-- @pengtalk — Reported the menu bar speed indicator width jitter (#122)
-- @pengtalk — Reported Enhanced Mode not reliably restoring after restart (#123)
+- @qzxwj — Reported the menu bar status item occupying too much width (#127)
+- @ljssafe — Reported the post-toggle Enhanced Mode menu freeze/flash (#125)
 
 ---
 
 ### 修复
 
-- **菜单栏网速显示不再抖动** — 上传 / 下载速度文字现在会在固定宽度的菜单栏区域内重绘，不再因为数字位数变化而调整整个状态栏图标宽度，因此网速从 `9.xx` 变成 `10.xx` 时旁边图标不会再跳动。(#122)
-- **增强模式重启恢复更可靠** — 如果退出或重启前已开启增强模式，ClashFX 启动后现在会在约一分钟内持续重试恢复流程，等待 privileged helper 和外部核心就绪，避免在应用或系统刚启动时只尝试一次就放弃。(#123)
+- **菜单栏状态项更省空间** — 上传 / 下载速度显示现在会根据实际渲染出来的文字宽度调整菜单栏项，不再预留过宽的固定区域；菜单栏拥挤时更紧凑，速度文字变长时也仍会自动扩展。(#127)
+- **增强模式切换后不再立刻重建菜单** — 开启或关闭增强模式后，ClashFX 现在会合并并稍微延迟配置同步、stream 重置和代理菜单刷新，避免用户马上重新打开菜单时出现明显卡顿或闪一下。(#125)
 
 ### 贡献者
 
-- @pengtalk — 反馈菜单栏网速显示宽度变化导致图标抖动的问题 (#122)
-- @pengtalk — 反馈重启后增强模式不能稳定自动恢复的问题 (#123)
+- @qzxwj — 反馈菜单栏状态项占用宽度偏大的问题 (#127)
+- @ljssafe — 反馈增强模式切换后菜单快速打开会卡顿 / 闪一下的问题 (#125)
 
 <!-- Previous release notes -->
 
