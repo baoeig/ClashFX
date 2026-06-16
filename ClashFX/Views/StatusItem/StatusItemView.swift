@@ -14,6 +14,8 @@ class StatusItemView: NSView, StatusItemViewProtocol {
     @IBOutlet var speedContainerView: NSView!
 
     private var speedTextView: SpeedTextView!
+    private let iconOnlyWidth: CGFloat = 25
+    private let speedTextPadding: CGFloat = 11
 
     // Use -1 so the first updateSpeedLabel(0, 0) call always triggers a redraw.
     var up: Int = -1
@@ -73,6 +75,11 @@ class StatusItemView: NSView, StatusItemViewProtocol {
         frame = CGRect(x: 0, y: 0, width: width, height: 22)
     }
 
+    var preferredWidth: CGFloat {
+        guard !speedContainerView.isHidden else { return iconOnlyWidth }
+        return iconOnlyWidth + speedTextView.textWidth + speedTextPadding
+    }
+
     func updateViewStatus(enableProxy: Bool) {
         if enableProxy {
             imageView.contentTintColor = NSColor.labelColor
@@ -97,6 +104,7 @@ class StatusItemView: NSView, StatusItemViewProtocol {
                 up: SpeedUtils.getSpeedString(for: up),
                 down: SpeedUtils.getSpeedString(for: down)
             )
+            updateStatusItemWidthIfNeeded()
         }
     }
 
@@ -104,5 +112,13 @@ class StatusItemView: NSView, StatusItemViewProtocol {
         speedContainerView.isHidden = !show
         speedLeadingConstraint?.isActive = show
         collapsedSpeedWidthConstraint?.isActive = !show
+        updateStatusItemWidthIfNeeded()
+    }
+
+    private func updateStatusItemWidthIfNeeded() {
+        let width = preferredWidth
+        guard statusItem?.length != width else { return }
+        statusItem?.length = width
+        updateSize(width: width)
     }
 }

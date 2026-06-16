@@ -17,7 +17,7 @@ import RxCocoa
 import RxSwift
 import Yams
 
-let statusItemLengthWithSpeed: CGFloat = 88
+let statusItemLengthWithSpeed: CGFloat = 65
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -316,10 +316,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .bind { [weak self] show in
                 guard let self = self else { return }
                 self.showNetSpeedIndicatorMenuItem.state = (show ?? true) ? .on : .off
-                let statusItemLength: CGFloat = (show ?? true) ? statusItemLengthWithSpeed : 25
+                self.statusItemView.showSpeedContainer(show: show ?? true)
+                let statusItemLength = self.statusItemView.preferredWidth
                 self.statusItem.length = statusItemLength
                 self.statusItemView.updateSize(width: statusItemLength)
-                self.statusItemView.showSpeedContainer(show: show ?? true)
             }.disposed(by: disposeBag)
 
         refreshStatusItemViewStatus()

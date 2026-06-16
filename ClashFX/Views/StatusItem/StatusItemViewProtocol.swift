@@ -13,4 +13,5 @@ protocol StatusItemViewProtocol: AnyObject {
     func updateSpeedLabel(up: Int, down: Int)
     func showSpeedContainer(show: Bool)
     func updateSize(width: CGFloat)
+    var preferredWidth: CGFloat { get }
 }
