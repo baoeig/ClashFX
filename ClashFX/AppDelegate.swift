@@ -2436,10 +2436,17 @@ extension AppDelegate {
 
         // Configs group
         let showConfigs = Settings.trayMenuShowConfigs
-        let anyConfigChild = Settings.trayMenuShowConfigSwitcher || Settings.trayMenuShowConfigEditor || Settings.trayMenuShowOpenConfigFolder || Settings.trayMenuShowReloadConfig || Settings.trayMenuShowUpdateExternal || Settings.trayMenuShowRemoteConfig || Settings.trayMenuShowRemoteController
+        let anyConfigChild = Settings.trayMenuShowConfigSwitcher
+            || Settings.trayMenuShowConfigEditor
+            || Settings.trayMenuShowProfileMixin
+            || Settings.trayMenuShowOpenConfigFolder
+            || Settings.trayMenuShowReloadConfig
+            || Settings.trayMenuShowUpdateExternal
+            || Settings.trayMenuShowRemoteConfig
+            || Settings.trayMenuShowRemoteController
         configsMenuItem.isHidden = !(showConfigs && anyConfigChild)
         configEditorMenuItem?.isHidden = !(showConfigs && Settings.trayMenuShowConfigEditor)
-        profileMixinMenuItem?.isHidden = !(showConfigs && Settings.trayMenuShowConfigEditor)
+        profileMixinMenuItem?.isHidden = !(showConfigs && Settings.trayMenuShowProfileMixin)
         openConfigFolderMenuItem.isHidden = !(showConfigs && Settings.trayMenuShowOpenConfigFolder)
         reloadConfigMenuItem.isHidden = !(showConfigs && Settings.trayMenuShowReloadConfig)
         updateExternalResourceMenuItem.isHidden = !(showConfigs && Settings.trayMenuShowUpdateExternal)

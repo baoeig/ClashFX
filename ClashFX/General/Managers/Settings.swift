@@ -318,6 +318,9 @@ enum Settings {
     @UserDefault("trayMenuShowConfigEditor", defaultValue: true)
     static var trayMenuShowConfigEditor: Bool
 
+    @UserDefault("trayMenuShowProfileMixin", defaultValue: true)
+    static var trayMenuShowProfileMixin: Bool
+
     @UserDefault("trayMenuShowOpenConfigFolder", defaultValue: true)
     static var trayMenuShowOpenConfigFolder: Bool
 

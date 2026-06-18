@@ -97,6 +97,7 @@ class TrayMenuSettingView: NSView {
                 children: [
                     ItemRow(title: NSLocalizedString("Config Switcher", comment: ""), getter: { Settings.trayMenuShowConfigSwitcher }, setter: { Settings.trayMenuShowConfigSwitcher = $0 }),
                     ItemRow(title: NSLocalizedString("Config Editor", comment: ""), getter: { Settings.trayMenuShowConfigEditor }, setter: { Settings.trayMenuShowConfigEditor = $0 }),
+                    ItemRow(title: NSLocalizedString("Profile Mixin", comment: ""), getter: { Settings.trayMenuShowProfileMixin }, setter: { Settings.trayMenuShowProfileMixin = $0 }),
                     ItemRow(title: NSLocalizedString("Open Config Folder", comment: ""), getter: { Settings.trayMenuShowOpenConfigFolder }, setter: { Settings.trayMenuShowOpenConfigFolder = $0 }),
                     ItemRow(title: NSLocalizedString("Reload Config", comment: ""), getter: { Settings.trayMenuShowReloadConfig }, setter: { Settings.trayMenuShowReloadConfig = $0 }),
                     ItemRow(title: NSLocalizedString("Update External Resources", comment: ""), getter: { Settings.trayMenuShowUpdateExternal }, setter: { Settings.trayMenuShowUpdateExternal = $0 }),
