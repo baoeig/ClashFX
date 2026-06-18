@@ -223,6 +223,9 @@ enum Settings {
     @UserDefault("enhancedMode", defaultValue: false)
     static var enhancedMode: Bool
 
+    @UserDefault("enhancedModeUseCustomConfig", defaultValue: false)
+    static var enhancedModeUseCustomConfig: Bool
+
     @UserDefault("bypassChineseApps", defaultValue: false)
     static var bypassChineseApps: Bool
 
