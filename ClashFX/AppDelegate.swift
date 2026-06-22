@@ -1543,9 +1543,12 @@ extension AppDelegate {
                 return
             }
             let selectedConfig = ConfigManager.selectConfigName
-            self?.requestConfigUpdateApplyingRuntimePatch(configName: selectedConfig) { _ in
+            self?.requestConfigUpdateApplyingRuntimePatch(configName: selectedConfig) { [weak self] error in
                 clashResumeCallbacks()
-                completion(nil)
+                if error == nil {
+                    self?.selectProxyGroupWithMemory()
+                }
+                completion(error)
             }
         }
     }
