@@ -1,3 +1,25 @@
+### Bug Fixes
+
+- **Enhanced Mode Disable Restores Manual Proxy Selection** — Turning Enhanced Mode off now reapplies ClashFX's remembered proxy-group selections after the built-in core reloads, so selector groups no longer fall back to the config default such as Auto Select. (#134)
+
+### Contributors
+
+- @ljssafe — Reported proxy selection falling back to Auto Select after disabling Enhanced Mode (#134)
+
+---
+
+### 修复
+
+- **关闭 Enhanced Mode 后会恢复手动选择的节点** — 关闭 Enhanced Mode 并重载回内置 core 后，ClashFX 现在会重新应用已记住的策略组节点选择，因此不会再回到配置默认项（例如“自动选择”）。(#134)
+
+### 贡献者
+
+- @ljssafe — 反馈关闭 Enhanced Mode 后节点回到自动选择的问题 (#134)
+
+<!-- Previous release notes -->
+
+---
+
 ### New Features
 
 - **Profile Mixin for Runtime Configs** — The Config menu now includes a Profile Mixin editor backed by `~/.config/clashfx/.profile_mixin.yaml`. ClashFX applies that mixin at runtime for reloads and Enhanced Mode without rewriting subscription files, so custom proxy groups/rules can survive profile updates. (#129)
