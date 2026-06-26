@@ -556,6 +556,9 @@
 "Advanced TUN Settings…" = "高级 TUN 设置…";
 "Advanced TUN Settings" = "高级 TUN 设置";
 "MTU 1500 matches the real internet path; 4064 is the macOS utun ceiling. Pinning Interface avoids the macOS sleep/wake auto-detect bug. Toggle Enhanced Mode off then on to apply." = "MTU 1500 与真实互联网路径一致；4064 是 macOS utun 的硬上限。指定出口网卡可避免 macOS 睡眠唤醒后自动探测失败的问题。修改后请关闭再开启增强模式以生效。";
+"MTU 1500 matches the real internet path; 4064 is the macOS utun ceiling. Pinning Interface avoids the macOS sleep/wake auto-detect bug. Use Custom Config keeps your config file as-is; Enhanced Mode still verifies TUN and applies macOS DNS override. Toggle Enhanced Mode off then on to apply." = "MTU 1500 与真实互联网路径一致；4064 是 macOS utun 的硬上限。指定出口网卡可避免 macOS 睡眠唤醒后自动探测失败的问题。Use Custom Config 会保持配置文件原样；增强模式仍会校验 TUN，并接管 macOS DNS。修改后请关闭再开启增强模式以生效。";
+"Use Custom Config as-is" = "按原样使用自定义配置";
+"Requires your config to define tun, DNS hijack/fake-ip DNS, external-controller, and LAN binding correctly. ClashFX will still apply and restore macOS DNS while Enhanced Mode is on." = "需要你的配置正确设置 tun、DNS hijack/fake-ip DNS、external-controller 和局域网绑定。增强模式开启期间，ClashFX 仍会接管并在关闭时恢复 macOS DNS。";
 "Apply" = "应用";
 "TUN MTU (%d–%d):" = "TUN MTU（%d–%d）：";
 "Interface (empty = auto-detect):" = "出口网卡（留空 = 自动探测）：";

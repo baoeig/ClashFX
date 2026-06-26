@@ -519,6 +519,9 @@
 "Advanced TUN Settings…" = "Advanced TUN Settings…";
 "Advanced TUN Settings" = "Advanced TUN Settings";
 "MTU 1500 matches the real internet path; 4064 is the macOS utun ceiling. Pinning Interface avoids the macOS sleep/wake auto-detect bug. Toggle Enhanced Mode off then on to apply." = "MTU 1500 matches the real internet path; 4064 is the macOS utun ceiling. Pinning Interface avoids the macOS sleep/wake auto-detect bug. Toggle Enhanced Mode off then on to apply.";
+"MTU 1500 matches the real internet path; 4064 is the macOS utun ceiling. Pinning Interface avoids the macOS sleep/wake auto-detect bug. Use Custom Config keeps your config file as-is; Enhanced Mode still verifies TUN and applies macOS DNS override. Toggle Enhanced Mode off then on to apply." = "MTU 1500 matches the real internet path; 4064 is the macOS utun ceiling. Pinning Interface avoids the macOS sleep/wake auto-detect bug. Use Custom Config keeps your config file as-is; Enhanced Mode still verifies TUN and applies macOS DNS override. Toggle Enhanced Mode off then on to apply.";
+"Use Custom Config as-is" = "Use Custom Config as-is";
+"Requires your config to define tun, DNS hijack/fake-ip DNS, external-controller, and LAN binding correctly. ClashFX will still apply and restore macOS DNS while Enhanced Mode is on." = "Requires your config to define tun, DNS hijack/fake-ip DNS, external-controller, and LAN binding correctly. ClashFX will still apply and restore macOS DNS while Enhanced Mode is on.";
 "Apply" = "Apply";
 "TUN MTU (%d–%d):" = "TUN MTU (%d–%d):";
 "Interface (empty = auto-detect):" = "Interface (empty = auto-detect):";

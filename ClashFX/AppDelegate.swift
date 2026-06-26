@@ -1213,8 +1213,13 @@ extension AppDelegate {
     @objc func showAdvancedTunSettings(_ sender: Any?) {
         let alert = NSAlert()
         alert.messageText = NSLocalizedString("Advanced TUN Settings", comment: "")
+        let advancedTunInfo = "MTU 1500 matches the real internet path; 4064 is the macOS utun ceiling. " +
+            "Pinning Interface avoids the macOS sleep/wake auto-detect bug. " +
+            "Use Custom Config keeps your config file as-is; " +
+            "Enhanced Mode still verifies TUN and applies macOS DNS override. " +
+            "Toggle Enhanced Mode off then on to apply."
         alert.informativeText = NSLocalizedString(
-            "MTU 1500 matches the real internet path; 4064 is the macOS utun ceiling. Pinning Interface avoids the macOS sleep/wake auto-detect bug. Use Custom Config starts Enhanced Mode from your selected config without TUN/DNS injection. Toggle Enhanced Mode off then on to apply.",
+            advancedTunInfo,
             comment: ""
         )
         alert.addButton(withTitle: NSLocalizedString("Apply", comment: ""))
@@ -1245,7 +1250,7 @@ extension AppDelegate {
         )
         customConfigButton.state = Settings.enhancedModeUseCustomConfig ? .on : .off
         customConfigButton.toolTip = NSLocalizedString(
-            "Requires your config to define tun, fake-ip DNS, external-controller, and allow-lan correctly.",
+            "Requires your config to define tun, DNS hijack/fake-ip DNS, external-controller, and LAN binding correctly. ClashFX will still apply and restore macOS DNS while Enhanced Mode is on.",
             comment: ""
         )
 
@@ -1445,11 +1450,12 @@ extension AppDelegate {
                     if success {
                         clashResumeCallbacks()
                         if Settings.enhancedModeUseCustomConfig {
-                            Logger.log("Enhanced Mode started with custom config as-is")
+                            Logger.log("Enhanced Mode started with custom config as-is; applying TUN checks and system DNS override")
                         } else {
-                            self.verifyTunStatus(port: port, secret: secret)
-                            self.overrideDNSForTun()
+                            Logger.log("Enhanced Mode started with generated enhanced config")
                         }
+                        self.verifyTunStatus(port: port, secret: secret)
+                        self.overrideDNSForTun()
                         completion(nil)
                     } else if attemptsLeft > 0, !Settings.enhancedModeUseCustomConfig {
                         Logger.log("External core not ready, regenerating config and retrying (\(attemptsLeft) left)", level: .warning)
