@@ -1,5 +1,27 @@
 ### Bug Fixes
 
+- **Custom Enhanced Mode Now Applies macOS DNS Override** — When `Use Custom Config as-is` is enabled, ClashFX still keeps the selected config file untouched, but Enhanced Mode now runs the same TUN verification and temporary macOS DNS override as the generated-config path. This prevents system DNS from staying on the router DNS while the custom TUN core is running. (#139)
+
+### Contributors
+
+- @mumaxiaozi — Reported that Enhanced Mode with `Use Custom Config as-is` left macOS DNS on the router DNS (#139)
+
+---
+
+### 修复
+
+- **自定义 Enhanced Mode 现在也会接管 macOS DNS** — 开启 `Use Custom Config as-is` 时，ClashFX 仍会保持所选配置文件原样，但 Enhanced Mode 会执行与生成配置路径一致的 TUN 校验和临时 macOS DNS 接管，避免自定义 TUN core 已运行时系统 DNS 仍停留在路由器 DNS。 (#139)
+
+### 贡献者
+
+- @mumaxiaozi — 反馈开启 `Use Custom Config as-is` 的 Enhanced Mode 后 macOS DNS 仍停留在路由器 DNS (#139)
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **Menu Bar Speed Indicator Is Compact Again** — The menu bar upload/download speed display now uses compact units such as `999KB/s`, a lighter fixed-width font, and competitor-aligned 4pt icon-to-text spacing, reducing the worst-case status item width by about 9pt while keeping the stable-width rendering path. (#137)
 
 ### Contributors
