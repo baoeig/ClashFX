@@ -912,16 +912,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             let yaml = try String(contentsOfFile: Paths.profileMixinPath, encoding: .utf8)
             guard !yaml.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-            guard let mixin = try Yams.load(yaml: yaml) as? [String: Any] else {
+            guard var mixin = try Yams.load(yaml: yaml) as? [String: Any] else {
                 Logger.log("[Profile Mixin] YAML root is not a dictionary, skipping", level: .warning)
                 return false
             }
+            applyProfileMixinRuleDirectives(from: &mixin, to: &root)
             root = mergeProfileMixin(mixin, into: root)
             Logger.log("[Profile Mixin] Applied \(Paths.profileMixinPath)")
             return true
         } catch {
             Logger.log("[Profile Mixin] Failed: \(error.localizedDescription)", level: .warning)
             return false
+        }
+    }
+
+    private func applyProfileMixinRuleDirectives(from mixin: inout [String: Any], to root: inout [String: Any]) {
+        guard var profile = mixin["profile"] as? [String: Any] else { return }
+
+        let prependRules = profileMixinRules(from: profile.removeValue(forKey: "prepend-rules"))
+        let appendRules = profileMixinRules(from: profile.removeValue(forKey: "append-rules"))
+        guard !prependRules.isEmpty || !appendRules.isEmpty else { return }
+
+        if profile.isEmpty {
+            mixin["profile"] = nil
+        } else {
+            mixin["profile"] = profile
+        }
+
+        let existingRules = profileMixinRules(from: root["rules"])
+        root["rules"] = mergeUniqueRules(prependRules + existingRules + appendRules)
+    }
+
+    private func profileMixinRules(from value: Any?) -> [String] {
+        guard let value = value else { return [] }
+        if let rules = value as? [String] {
+            return rules
+        }
+        if let rules = value as? [Any] {
+            return rules.compactMap { $0 as? String }
+        }
+        Logger.log("[Profile Mixin] Rule directive is not a string array, skipping", level: .warning)
+        return []
+    }
+
+    private func mergeUniqueRules(_ rules: [String]) -> [String] {
+        var seen = Set<String>()
+        return rules.filter { rule in
+            guard !seen.contains(rule) else { return false }
+            seen.insert(rule)
+            return true
         }
     }
 
