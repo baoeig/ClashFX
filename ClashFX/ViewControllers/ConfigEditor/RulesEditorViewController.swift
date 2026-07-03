@@ -6,6 +6,20 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
     }
 
     private let tableView = NSTableView()
+    private let ruleBucketPopup = NSPopUpButton()
+    private enum RuleBucket: Int {
+        case rules
+        case profilePrependRules
+        case profileAppendRules
+
+        var fallbackRule: String {
+            switch self {
+            case .rules, .profilePrependRules: return "DOMAIN-SUFFIX,,DIRECT"
+            case .profileAppendRules: return "MATCH,DIRECT"
+            }
+        }
+    }
+
     private let ruleTypes = [
         "DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-REGEX",
         "IP-CIDR", "IP-CIDR6", "GEOIP", "GEOSITE",
@@ -56,6 +70,12 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
         buttonBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(buttonBar)
 
+        ruleBucketPopup.translatesAutoresizingMaskIntoConstraints = false
+        ruleBucketPopup.addItems(withTitles: ["rules", "profile.prepend-rules", "profile.append-rules"])
+        ruleBucketPopup.target = self
+        ruleBucketPopup.action = #selector(ruleBucketChanged)
+        buttonBar.addSubview(ruleBucketPopup)
+
         let addBtn = NSButton(title: "+", target: self, action: #selector(addRule))
         addBtn.translatesAutoresizingMaskIntoConstraints = false
         addBtn.bezelStyle = .smallSquare
@@ -77,7 +97,11 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
             buttonBar.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -8),
             buttonBar.heightAnchor.constraint(equalToConstant: 24),
 
-            addBtn.leadingAnchor.constraint(equalTo: buttonBar.leadingAnchor),
+            ruleBucketPopup.leadingAnchor.constraint(equalTo: buttonBar.leadingAnchor),
+            ruleBucketPopup.centerYAnchor.constraint(equalTo: buttonBar.centerYAnchor),
+            ruleBucketPopup.widthAnchor.constraint(equalToConstant: 220),
+
+            addBtn.leadingAnchor.constraint(equalTo: ruleBucketPopup.trailingAnchor, constant: 8),
             addBtn.centerYAnchor.constraint(equalTo: buttonBar.centerYAnchor),
             addBtn.widthAnchor.constraint(equalToConstant: 24),
 
@@ -96,26 +120,38 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
         ])
     }
 
-    @objc private func addRule() {
-        document?.rules.append("DOMAIN-SUFFIX,,DIRECT")
+    @objc private func ruleBucketChanged() {
+        tableView.deselectAll(nil)
         tableView.reloadData()
-        let lastRow = (document?.rules.count ?? 1) - 1
+    }
+
+    @objc private func addRule() {
+        var rules = selectedRules()
+        rules.append(selectedRuleBucket.fallbackRule)
+        setSelectedRules(rules)
+        tableView.reloadData()
+        let lastRow = rules.count - 1
         tableView.selectRowIndexes(IndexSet(integer: lastRow), byExtendingSelection: false)
         tableView.scrollRowToVisible(lastRow)
     }
 
     @objc private func removeRule() {
         let rows = tableView.selectedRowIndexes.sorted().reversed()
+        var rules = selectedRules()
         for row in rows {
-            document?.rules.remove(at: row)
+            guard row >= 0, row < rules.count else { continue }
+            rules.remove(at: row)
         }
+        setSelectedRules(rules)
         tableView.reloadData()
     }
 
     @objc private func duplicateRule() {
         let row = tableView.selectedRow
-        guard row >= 0, let rules = document?.rules, row < rules.count else { return }
-        document?.rules.insert(rules[row], at: row + 1)
+        var rules = selectedRules()
+        guard row >= 0, row < rules.count else { return }
+        rules.insert(rules[row], at: row + 1)
+        setSelectedRules(rules)
         tableView.reloadData()
     }
 
@@ -138,11 +174,13 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        document?.rules.count ?? 0
+        selectedRules().count
     }
 
     func tableView(_ tableView: NSTableView, objectValueFor tableColumn: NSTableColumn?, row: Int) -> Any? {
-        guard let rule = document?.rules[row] else { return nil }
+        let rules = selectedRules()
+        guard row < rules.count else { return nil }
+        let rule = rules[row]
         let parsed = parseRule(rule)
         switch tableColumn?.identifier.rawValue {
         case "type": return parsed.type
@@ -153,7 +191,9 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
     }
 
     func tableView(_ tableView: NSTableView, setObjectValue object: Any?, for tableColumn: NSTableColumn?, row: Int) {
-        guard let str = object as? String, let rule = document?.rules[row] else { return }
+        var rules = selectedRules()
+        guard let str = object as? String, row < rules.count else { return }
+        let rule = rules[row]
         var parsed = parseRule(rule)
         switch tableColumn?.identifier.rawValue {
         case "type": parsed.type = str
@@ -161,7 +201,8 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
         case "proxy": parsed.proxy = str
         default: break
         }
-        document?.rules[row] = buildRule(type: parsed.type, value: parsed.value, proxy: parsed.proxy)
+        rules[row] = buildRule(type: parsed.type, value: parsed.value, proxy: parsed.proxy)
+        setSelectedRules(rules)
     }
 
     func tableView(_ tableView: NSTableView, writeRowsWith rowIndexes: IndexSet, to pboard: NSPasteboard) -> Bool {
@@ -181,7 +222,7 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
               let sourceIndexes = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSIndexSet.self, from: data) as IndexSet?
         else { return false }
 
-        guard var rules = document?.rules else { return false }
+        var rules = selectedRules()
         var items: [String] = []
         for idx in sourceIndexes.sorted().reversed() {
             items.insert(rules[idx], at: 0)
@@ -197,8 +238,29 @@ class RulesEditorViewController: NSViewController, NSTableViewDataSource, NSTabl
             rules.insert(item, at: insertAt + i)
         }
 
-        document?.rules = rules
+        setSelectedRules(rules)
         tableView.reloadData()
         return true
+    }
+
+    private var selectedRuleBucket: RuleBucket {
+        RuleBucket(rawValue: ruleBucketPopup.indexOfSelectedItem) ?? .rules
+    }
+
+    private func selectedRules() -> [String] {
+        guard let document = document else { return [] }
+        switch selectedRuleBucket {
+        case .rules: return document.rules
+        case .profilePrependRules: return document.profilePrependRules
+        case .profileAppendRules: return document.profileAppendRules
+        }
+    }
+
+    private func setSelectedRules(_ rules: [String]) {
+        switch selectedRuleBucket {
+        case .rules: document?.rules = rules
+        case .profilePrependRules: document?.profilePrependRules = rules
+        case .profileAppendRules: document?.profileAppendRules = rules
+        }
     }
 }

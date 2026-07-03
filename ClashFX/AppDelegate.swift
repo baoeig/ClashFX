@@ -869,7 +869,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return nil
             }
 
-            var changed = applyProfileMixin(to: &root)
+            var changed = applyProfileRuleDirectives(in: &root)
+            changed = applyProfileMixin(to: &root) || changed
 
             if includeRulePatch && !Settings.enhancedMode {
                 let injectedRules = Settings.proxyIgnoreListAsRules()
@@ -916,7 +917,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 Logger.log("[Profile Mixin] YAML root is not a dictionary, skipping", level: .warning)
                 return false
             }
-            applyProfileMixinRuleDirectives(from: &mixin, to: &root)
+            applyProfileRuleDirectives(from: &mixin, to: &root)
             root = mergeProfileMixin(mixin, into: root)
             Logger.log("[Profile Mixin] Applied \(Paths.profileMixinPath)")
             return true
@@ -926,21 +927,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func applyProfileMixinRuleDirectives(from mixin: inout [String: Any], to root: inout [String: Any]) {
-        guard var profile = mixin["profile"] as? [String: Any] else { return }
+    private func applyProfileRuleDirectives(in root: inout [String: Any]) -> Bool {
+        guard let ruleDirectives = takeProfileRuleDirectives(from: &root) else { return false }
+
+        logProfileProcessRuleWarningIfNeeded(ruleDirectives.prepend + ruleDirectives.append)
+        let existingRules = profileMixinRules(from: root["rules"])
+        root["rules"] = mergeUniqueRules(ruleDirectives.prepend + existingRules + ruleDirectives.append)
+        return true
+    }
+
+    private func applyProfileRuleDirectives(from mixin: inout [String: Any], to root: inout [String: Any]) {
+        guard let ruleDirectives = takeProfileRuleDirectives(from: &mixin) else { return }
+
+        logProfileProcessRuleWarningIfNeeded(ruleDirectives.prepend + ruleDirectives.append)
+        let existingRules = profileMixinRules(from: root["rules"])
+        root["rules"] = mergeUniqueRules(ruleDirectives.prepend + existingRules + ruleDirectives.append)
+    }
+
+    private func takeProfileRuleDirectives(from root: inout [String: Any]) -> (prepend: [String], append: [String])? {
+        guard var profile = root["profile"] as? [String: Any] else { return nil }
 
         let prependRules = profileMixinRules(from: profile.removeValue(forKey: "prepend-rules"))
         let appendRules = profileMixinRules(from: profile.removeValue(forKey: "append-rules"))
-        guard !prependRules.isEmpty || !appendRules.isEmpty else { return }
+        guard !prependRules.isEmpty || !appendRules.isEmpty else { return nil }
 
         if profile.isEmpty {
-            mixin["profile"] = nil
+            root["profile"] = nil
         } else {
-            mixin["profile"] = profile
+            root["profile"] = profile
         }
 
-        let existingRules = profileMixinRules(from: root["rules"])
-        root["rules"] = mergeUniqueRules(prependRules + existingRules + appendRules)
+        return (prependRules, appendRules)
+    }
+
+    private func logProfileProcessRuleWarningIfNeeded(_ rules: [String]) {
+        guard !Settings.enhancedMode else { return }
+        let hasProcessRule = rules.contains { rule in
+            rule.hasPrefix("PROCESS-NAME,") || rule.hasPrefix("PROCESS-PATH,")
+        }
+        if hasProcessRule {
+            Logger.log("[Profile Rules] PROCESS-NAME and PROCESS-PATH rules require Enhanced Mode (TUN) to match reliably", level: .warning)
+        }
     }
 
     private func profileMixinRules(from value: Any?) -> [String] {
@@ -2268,6 +2295,15 @@ extension AppDelegate {
             #     type: url-test
             #     use:
             #       - ProviderName
+            #
+            # Rules can be inserted before or after the selected profile's rules:
+            # profile:
+            #   prepend-rules:
+            #     - "DOMAIN-SUFFIX,example.com,DIRECT"
+            #   append-rules:
+            #     - "MATCH,Proxy"
+            #
+            # PROCESS-NAME and PROCESS-PATH rules require Enhanced Mode (TUN).
 
             """
             try? template.write(toFile: Paths.profileMixinPath, atomically: true, encoding: .utf8)

@@ -439,6 +439,8 @@ class ConfigDocument {
     var proxies: [ProxyDefinition] = []
     var proxyGroups: [ProxyGroupDefinition] = []
     var rules: [String] = []
+    var profilePrependRules: [String] = []
+    var profileAppendRules: [String] = []
     var ruleProviders = OrderedDictionary<String, Any>()
     var proxyProviders = OrderedDictionary<String, Any>()
     var unknownSections = OrderedDictionary<String, Any>()
@@ -489,6 +491,11 @@ class ConfigDocument {
             doc.rules = ruleList
         }
 
+        if let profile = doc.general.profile {
+            doc.profilePrependRules = stringRules(from: profile["prepend-rules"])
+            doc.profileAppendRules = stringRules(from: profile["append-rules"])
+        }
+
         if let providers = root["rule-providers"] as? [String: Any] {
             for (k, v) in providers {
                 doc.ruleProviders[k] = v
@@ -513,6 +520,21 @@ class ConfigDocument {
 
     func toYAMLDictionary() -> OrderedDictionary<String, Any> {
         var root = general.toOrderedDict()
+
+        var profile = root["profile"] as? [String: Any] ?? [:]
+        profile.removeValue(forKey: "prepend-rules")
+        profile.removeValue(forKey: "append-rules")
+        if !profilePrependRules.isEmpty {
+            profile["prepend-rules"] = profilePrependRules
+        }
+        if !profileAppendRules.isEmpty {
+            profile["append-rules"] = profileAppendRules
+        }
+        if profile.isEmpty {
+            root["profile"] = nil
+        } else {
+            root["profile"] = profile
+        }
 
         if dns.hasContent, let dnsDict = dns.toDict() {
             root["dns"] = dnsDict
@@ -569,5 +591,15 @@ class ConfigDocument {
 
     func serializeToYAML() -> String {
         YAMLSerializer.serialize(self)
+    }
+
+    private static func stringRules(from value: Any?) -> [String] {
+        if let rules = value as? [String] {
+            return rules
+        }
+        if let rules = value as? [Any] {
+            return rules.compactMap { $0 as? String }
+        }
+        return []
     }
 }
