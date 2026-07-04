@@ -11,20 +11,22 @@ class ConfigEditorWindowController: NSWindowController {
     private var visualContainer: NSView!
     private var configDocument: ConfigDocument?
     private var isVisualMode = false
+    private var windowKey = ""
 
-    private static var current: ConfigEditorWindowController?
+    private static var openWindows: [String: ConfigEditorWindowController] = [:]
+    private static let currentConfigWindowKey = "__current_config__"
+    private static let profileMixinTitle = "Profile Mixin"
 
     static func show(configPath: String? = nil) {
-        if let existing = current, existing.window?.isVisible == true {
-            if let path = configPath {
-                existing.loadFile(path: path)
-            }
+        let key = configPath ?? currentConfigWindowKey
+        if let existing = openWindows[key], existing.window?.isVisible == true {
             existing.window?.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
         let controller = ConfigEditorWindowController()
-        current = controller
+        controller.windowKey = key
+        openWindows[key] = controller
         controller.showWindow(nil)
         if let path = configPath {
             controller.loadFile(path: path)
@@ -275,13 +277,15 @@ class ConfigEditorWindowController: NSWindowController {
         for name in configs {
             filePopup.addItem(withTitle: name)
         }
+        filePopup.addItem(withTitle: Self.profileMixinTitle)
         filePopup.selectItem(withTitle: ConfigManager.selectConfigName)
     }
 
     private func loadCurrentConfig() {
         let name = ConfigManager.selectConfigName
-        let path = Paths.localConfigPath(for: name)
-        loadFile(path: path)
+        ConfigManager.getConfigPath(configName: name) { [weak self] path in
+            self?.loadFile(path: path)
+        }
     }
 
     func loadFile(path: String) {
@@ -302,6 +306,11 @@ class ConfigEditorWindowController: NSWindowController {
 
             let fileName = (path as NSString).lastPathComponent
             window?.title = "ClashFX Config Editor — \(fileName)"
+            if isProfileMixinPath(path) {
+                filePopup.selectItem(withTitle: Self.profileMixinTitle)
+            } else {
+                filePopup.selectItem(withTitle: (fileName as NSString).deletingPathExtension)
+            }
             let lineCount = content.components(separatedBy: "\n").count
             statusLabel.stringValue = "\(lineCount) lines"
 
@@ -330,7 +339,20 @@ class ConfigEditorWindowController: NSWindowController {
 
     @objc private func fileSelectionChanged(_ sender: NSPopUpButton) {
         guard let name = sender.selectedItem?.title else { return }
-        let path = Paths.localConfigPath(for: name)
+        if name == Self.profileMixinTitle {
+            loadProfileMixinFile()
+            return
+        }
+        ConfigManager.getConfigPath(configName: name) { [weak self] path in
+            self?.loadFile(path: path)
+        }
+    }
+
+    private func loadProfileMixinFile() {
+        let path = Paths.profileMixinPath
+        if !FileManager.default.fileExists(atPath: path) {
+            try? "# Profile Mixin is merged into the selected profile at runtime.\n".write(toFile: path, atomically: true, encoding: .utf8)
+        }
         loadFile(path: path)
     }
 
@@ -362,8 +384,15 @@ class ConfigEditorWindowController: NSWindowController {
 
     @objc private func saveAndReload() {
         saveFile()
-        let configName = filePopup.selectedItem?.title ?? ConfigManager.selectConfigName
+        let configName = isProfileMixinPath(filePath) ? ConfigManager.selectConfigName : (filePopup.selectedItem?.title ?? ConfigManager.selectConfigName)
         AppDelegate.shared.updateConfig(configName: configName)
+    }
+
+    private func isProfileMixinPath(_ path: String) -> Bool {
+        let standardizedPath = (path as NSString).standardizingPath
+        let localPath = (kProfileMixinFilePath as NSString).standardizingPath
+        let activePath = (Paths.profileMixinPath as NSString).standardizingPath
+        return standardizedPath == localPath || standardizedPath == activePath
     }
 
     // MARK: - YAML Syntax Highlighting
@@ -507,7 +536,7 @@ extension ConfigEditorWindowController: NSTextViewDelegate {
 
 extension ConfigEditorWindowController: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
-        ConfigEditorWindowController.current = nil
+        ConfigEditorWindowController.openWindows[windowKey] = nil
         // Hide from Dock when no editor windows are open
         // (check if other key windows exist first)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {

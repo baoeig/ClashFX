@@ -22,10 +22,12 @@ class ICloudManager {
     private var disposeBag = DisposeBag()
 
     let useiCloud = BehaviorRelay<Bool>(value: false)
+    let userEnableiCloudRelay = BehaviorRelay<Bool>(value: UserDefaults.standard.bool(forKey: "kUserEnableiCloud"))
 
     var userEnableiCloud: Bool = UserDefaults.standard.bool(forKey: "kUserEnableiCloud") {
         didSet {
             UserDefaults.standard.set(userEnableiCloud, forKey: "kUserEnableiCloud")
+            userEnableiCloudRelay.accept(userEnableiCloud)
             useiCloud.accept(userEnableiCloud && icloudAvailable)
         }
     }
@@ -38,6 +40,7 @@ class ICloudManager {
         }.disposed(by: disposeBag)
 
         icloudAvailable = isICloudAvailable()
+        userEnableiCloudRelay.accept(userEnableiCloud)
         useiCloud.accept(userEnableiCloud && icloudAvailable)
     }
 

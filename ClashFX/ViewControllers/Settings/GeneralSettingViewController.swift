@@ -78,7 +78,7 @@ class GeneralSettingViewController: NSViewController {
             LaunchAtLogin.shared.isEnabled = $0
         }.disposed(by: disposeBag)
 
-        ICloudManager.shared.useiCloud
+        ICloudManager.shared.userEnableiCloudRelay
             .map { $0 ? .on : .off }
             .bind(to: useiCloudButton.rx.state)
             .disposed(by: disposeBag)

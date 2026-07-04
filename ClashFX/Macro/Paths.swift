@@ -16,6 +16,12 @@ enum Paths {
     }
 
     static var profileMixinPath: String {
+        if ICloudManager.shared.useiCloud.value,
+           var url = FileManager.default.url(forUbiquityContainerIdentifier: nil) {
+            url.appendPathComponent("Documents")
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
+            return url.appendingPathComponent(".profile_mixin.yaml").path
+        }
         return kProfileMixinFilePath
     }
 
