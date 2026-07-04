@@ -1,5 +1,27 @@
 ### Bug Fixes
 
+- **Profile Mixin Visual Editor Opens the Right Rule Bucket** — When a Profile Mixin only contains `profile.prepend-rules` or `profile.append-rules`, switching from source view to visual mode now automatically selects the non-empty Profile rule bucket instead of showing an empty top-level `rules` table. (#129)
+- **Profile Mixin and Config Editor Can Open Side by Side** — Opening Config Editor while the Profile Mixin editor is already visible now opens or focuses the selected profile editor instead of silently reusing the existing Profile Mixin window. The config picker also includes a Profile Mixin entry for direct navigation. (#129)
+- **Profile Mixin Follows iCloud Config Storage** — When iCloud config storage is enabled, the Profile Mixin file now resolves to the iCloud Documents container as well, so custom mixin rules stay with the rest of the synced configuration set. (#129)
+- **ClashFX Networking Is Direct in Enhanced Mode** — Enhanced Mode now prepends a built-in `PROCESS-NAME,ClashFX Networking,DIRECT` rule before subscription rules so the networking helper is not accidentally routed by a provider rule. (#129)
+- **iCloud Settings Toggle Reflects the User Choice** — The iCloud checkbox now stays responsive to the saved user preference even when iCloud availability temporarily prevents syncing, instead of immediately snapping back based on the effective runtime state.
+
+---
+
+### 修复
+
+- **Profile Mixin 可视化编辑器会自动打开正确规则项** — 当 Profile Mixin 只包含 `profile.prepend-rules` 或 `profile.append-rules` 时，从源码切换到可视化模式会自动选中有内容的 Profile 规则项，不再显示空的顶层 `rules` 表格。 (#129)
+- **Profile Mixin 与配置编辑器可以同时打开** — 已打开 Profile Mixin 编辑器时，再点配置编辑器会打开或聚焦当前配置编辑器，不再静默复用已有的 Profile Mixin 窗口。左上角配置下拉也新增 Profile Mixin 入口，便于直接切换。 (#129)
+- **Profile Mixin 跟随 iCloud 配置存储** — 开启 iCloud 存储配置后，Profile Mixin 文件也会解析到 iCloud Documents 容器，自定义 mixin 规则会和其他配置文件一起同步。 (#129)
+- **Enhanced Mode 会直连 ClashFX Networking** — Enhanced Mode 现在会在订阅规则前插入内置 `PROCESS-NAME,ClashFX Networking,DIRECT`，避免网络子进程被订阅规则错误代理。 (#129)
+- **iCloud 设置开关会反映用户选择** — iCloud 勾选框现在绑定保存的用户偏好；即使 iCloud 暂时不可用导致运行时未启用，也不会在点击后立刻按有效状态弹回。
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **Profile Rule Buckets Show in the Visual Editor** — The Rules visual editor now lets you switch between top-level `rules`, `profile.prepend-rules`, and `profile.append-rules`, so Profile Mixin rule directives added in source view are visible and editable without falling back to raw YAML. ClashFX also expands config-embedded `profile.prepend-rules` into runtime rules before subscription rules, and warns when PROCESS rules need Enhanced Mode to match. (#129)
 
 ---
