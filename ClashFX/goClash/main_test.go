@@ -62,6 +62,7 @@ func TestPrependUniqueRulesAddsEnhancedCoreProcessRulesFirst(t *testing.T) {
 
 	rules := rawMap["rules"].([]interface{})
 	want := []string{
+		"PROCESS-NAME,ClashFX Networking,DIRECT",
 		"PROCESS-NAME,mihomo,DIRECT",
 		"PROCESS-NAME,mihomo-bin,DIRECT",
 		"PROCESS-NAME,mihomo_core,DIRECT",

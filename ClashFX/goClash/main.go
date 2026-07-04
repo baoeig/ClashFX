@@ -64,6 +64,7 @@ const defaultTunMTU uint32 = 1500
 const enhancedControllerPort = 19090
 
 var enhancedCoreProcessDirectRules = []string{
+	"PROCESS-NAME,ClashFX Networking,DIRECT",
 	"PROCESS-NAME,mihomo,DIRECT",
 	"PROCESS-NAME,mihomo-bin,DIRECT",
 	"PROCESS-NAME,mihomo_core,DIRECT",
