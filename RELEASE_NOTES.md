@@ -1,5 +1,31 @@
 ### Bug Fixes
 
+- **Dashboard Header No Longer Gets Covered in Full Screen** — The native dashboard now uses an in-window header instead of a macOS toolbar, so the Recent/Active Connections switcher and search field stay visible when the dashboard enters full screen. (#129)
+- **Profile Mixin iCloud Sync Uses a Visible File and Reloads Cleanly** — When iCloud config storage is enabled, ClashFX now migrates the local or legacy hidden mixin into a visible `Profile Mixin.yaml` file in iCloud Documents, filters it out of normal config lists, refreshes the config menu, watches the iCloud-selected config, and reloads it without requiring an app restart. (#129)
+- **Subscription Rules Editor Keeps Profile Buckets Out of Normal Configs** — The visual Rules editor now keeps the rule bucket selector disabled on normal subscription configs and only exposes `profile.prepend-rules` / `profile.append-rules` when editing Profile Mixin, avoiding accidental edits to Profile-only rule buckets from the config editor. (#129)
+
+### Contributors
+
+- @a51095 — Continued verification for Profile Mixin, iCloud sync, and dashboard full-screen regressions. (#129)
+
+---
+
+### 修复
+
+- **控制台全屏时顶部不再被遮挡** — 原生控制台现在使用窗口内容内的顶部栏，不再依赖 macOS toolbar；进入全屏后，“最近连接 / 活动连接”切换和搜索框会保持可见。 (#129)
+- **Profile Mixin 的 iCloud 同步改为可见文件并会正确重载** — 开启 iCloud 配置存储后，ClashFX 会把本地或旧版隐藏 mixin 迁移为 iCloud Documents 中可见的 `Profile Mixin.yaml`，同时从普通配置列表中过滤该文件，刷新配置菜单，监听 iCloud 当前配置并自动重载，无需重启 App。 (#129)
+- **订阅规则编辑器不再暴露 Profile 专属规则项** — 普通订阅配置的可视化 Rules 编辑器现在会禁用规则项下拉，只保留 `rules`；只有编辑 Profile Mixin 时才显示 `profile.prepend-rules` / `profile.append-rules`，避免从配置编辑器误改 Profile 专属规则桶。 (#129)
+
+### 贡献者
+
+- @a51095 — 持续验证 Profile Mixin、iCloud 同步和控制台全屏遮挡问题。 (#129)
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **Profile Mixin Visual Editor Opens the Right Rule Bucket** — When a Profile Mixin only contains `profile.prepend-rules` or `profile.append-rules`, switching from source view to visual mode now automatically selects the non-empty Profile rule bucket instead of showing an empty top-level `rules` table. (#129)
 - **Profile Mixin and Config Editor Can Open Side by Side** — Opening Config Editor while the Profile Mixin editor is already visible now opens or focuses the selected profile editor instead of silently reusing the existing Profile Mixin window. The config picker also includes a Profile Mixin entry for direct navigation. (#129)
 - **Profile Mixin Follows iCloud Config Storage** — When iCloud config storage is enabled, the Profile Mixin file now resolves to the iCloud Documents container as well, so custom mixin rules stay with the rest of the synced configuration set. (#129)
