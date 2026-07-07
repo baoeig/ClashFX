@@ -116,25 +116,10 @@ class ClashWebViewContoller: NSViewController {
         if #available(macOS 13.3, *) {
             webview.isInspectable = true
         }
-        webview.setValue(false, forKey: "drawsBackground")
-
-        let layoutPatchJS = """
-        (function() {
-          var s = document.createElement('style');
-          s.textContent = [
-            'aside, [class*="aside"], [class*="sidebar"], [class*="Sidebar"] { padding-top: 28px !important; }',
-            '[class*="_p5j7u"] { height: 28px !important; min-height: 0 !important; overflow: hidden !important; }'
-          ].join(' ');
-          if (document.head) document.head.appendChild(s);
-          else document.addEventListener('DOMContentLoaded', function() { document.head.appendChild(s); });
-        })();
-        """
         let guardScript = WKUserScript(source: Self.apiGuardJS, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         let hideScript = WKUserScript(source: Self.hideUpgradeJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
-        let padScript = WKUserScript(source: layoutPatchJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         webview.configuration.userContentController.addUserScript(guardScript)
         webview.configuration.userContentController.addUserScript(hideScript)
-        webview.configuration.userContentController.addUserScript(padScript)
 
         bridge = JsBridgeUtil.initJSbridge(webview: webview, delegate: self)
 
@@ -150,18 +135,26 @@ class ClashWebViewContoller: NSViewController {
 
     override func viewWillAppear() {
         super.viewWillAppear()
-        view.window?.titleVisibility = .hidden
-        view.window?.titlebarAppearsTransparent = true
-        view.window?.styleMask.insert(.fullSizeContentView)
+        configureWindowAppearance()
+    }
 
-        view.window?.isOpaque = false
-        view.window?.backgroundColor = NSColor.clear
-        view.window?.toolbar = NSToolbar()
-        view.window?.toolbar?.showsBaselineSeparator = false
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        configureWindowAppearance()
+    }
+
+    private func configureWindowAppearance() {
+        guard let window = view.window else { return }
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = false
+        window.styleMask.remove(.fullSizeContentView)
+        window.toolbar = nil
+        window.isOpaque = true
+        window.backgroundColor = NSColor.windowBackgroundColor
+        window.minSize = minSize
+
         view.wantsLayer = true
-        view.layer?.cornerRadius = 10
-
-        view.window?.minSize = minSize
+        view.layer?.cornerRadius = 0
     }
 
     func setupView() {
