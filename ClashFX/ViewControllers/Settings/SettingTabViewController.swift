@@ -24,6 +24,7 @@ class SettingTabViewController: NSTabViewController, NibLoadable {
         }
         configureTabIcons()
         insertAppearanceTab()
+        wrapTabsForWindowResizing()
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -145,5 +146,68 @@ class SettingTabViewController: NSTabViewController, NibLoadable {
             item.image = makeFallbackIcon(glyph: "🎨")
         }
         insertTabViewItem(item, at: 1)
+    }
+
+    private func wrapTabsForWindowResizing() {
+        for item in tabViewItems {
+            guard let vc = item.viewController,
+                  !(vc is ResizableSettingsPageContainerViewController) else { continue }
+            item.viewController = ResizableSettingsPageContainerViewController(contentViewController: vc)
+        }
+    }
+}
+
+private final class ResizableSettingsPageContainerViewController: NSViewController {
+    private let contentViewController: NSViewController
+    private var contentView: NSView {
+        contentViewController.view
+    }
+
+    init(contentViewController: NSViewController) {
+        self.contentViewController = contentViewController
+        super.init(nibName: nil, bundle: nil)
+        title = contentViewController.title
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        let initialSize = initialContentSize()
+        let containerView = NSView(frame: NSRect(origin: .zero, size: initialSize))
+        containerView.autoresizingMask = [.width, .height]
+
+        addChild(contentViewController)
+        contentView.frame = containerView.bounds
+        contentView.autoresizingMask = [.width, .height]
+        contentView.translatesAutoresizingMaskIntoConstraints = true
+        contentView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        contentView.setContentHuggingPriority(.defaultLow, for: .vertical)
+        contentView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        contentView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        containerView.addSubview(contentView)
+
+        view = containerView
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        contentView.frame = view.bounds
+        contentView.layoutSubtreeIfNeeded()
+    }
+
+    private func initialContentSize() -> NSSize {
+        let frameSize = contentView.frame.size
+        if frameSize.width > 0, frameSize.height > 0 {
+            return frameSize
+        }
+
+        let fittingSize = contentView.fittingSize
+        return NSSize(
+            width: max(400, fittingSize.width),
+            height: max(360, fittingSize.height)
+        )
     }
 }
