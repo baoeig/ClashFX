@@ -1,5 +1,27 @@
 ### Bug Fixes
 
+- **Settings Window Resizing Works Again** — The Settings window now stays resizable while clamping only its maximum size and current frame to the visible screen area. It also reapplies the clamp after restoring a previously saved window size, so old oversized settings windows no longer slip behind the Dock. (#129)
+
+### Contributors
+
+- @a51095 — Verified that v1.1.5.8 still restored an oversized, non-resizable Settings window. (#129)
+
+---
+
+### 修复
+
+- **设置窗口恢复可缩放** — 设置窗口现在只限制最大尺寸和当前窗口位置，不再切换 tab 时强制回固定高度；同时会在恢复历史窗口尺寸后再次按屏幕可见区域校正，避免旧的大窗口继续被 Dock 遮挡。 (#129)
+
+### 贡献者
+
+- @a51095 — 验证 v1.1.5.8 仍会恢复过大的、不可缩放的设置窗口。 (#129)
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **Settings Window Stays Above the Dock** — Settings now clamps its window frame to the current screen's visible area when opening or switching tabs, accounting for the titlebar/tab chrome so the Appearance tray-menu options remain reachable without entering full screen. (#129)
 
 ### Contributors
