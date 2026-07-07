@@ -1,5 +1,27 @@
 ### Bug Fixes
 
+- **Settings Window Stays Above the Dock** — Settings now clamps its window frame to the current screen's visible area when opening or switching tabs, accounting for the titlebar/tab chrome so the Appearance tray-menu options remain reachable without entering full screen. (#129)
+
+### Contributors
+
+- @a51095 — Reported the Appearance settings window overlapping the Dock in normal window mode. (#129)
+
+---
+
+### 修复
+
+- **设置窗口不再被 Dock 遮挡** — 打开设置或切换设置 tab 时，现在会按当前屏幕可见区域重新限制窗口高度，并计入标题栏 / tab 栏高度；“外观”页底部的菜单栏选项无需全屏也能滚动查看。 (#129)
+
+### 贡献者
+
+- @a51095 — 反馈“外观”设置页普通窗口模式下底部被 Dock 遮挡的问题。 (#129)
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **Web Dashboard No Longer Shows a White Top Bar in Full Screen** — The Dashboard menu window now uses a standard content layout instead of a transparent full-size titlebar with an empty macOS toolbar, and removes the old 28px dashboard padding patch. This keeps the Web dashboard navigation visible when the window enters full screen. (#129)
 
 ### Contributors
