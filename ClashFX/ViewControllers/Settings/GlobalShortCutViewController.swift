@@ -36,6 +36,11 @@ extension KeyboardShortcuts.Name {
         default: .init(.g, modifiers: .option)
     )
 
+    static let toggleEnhancedMode = Self(
+        "shortCut.toggleEnhancedMode",
+        default: .init(.e, modifiers: [.control, .option])
+    )
+
     static let log = Self(
         "shortCut.log",
         default: .init(.l, modifiers: .command)
@@ -77,6 +82,10 @@ enum KeyboardShortCutManager {
             AppDelegate.shared.switchProxyMode(mode: .global)
         }
 
+        KeyboardShortcuts.onKeyUp(for: .toggleEnhancedMode) {
+            AppDelegate.shared.actionToggleEnhancedMode(nil)
+        }
+
         KeyboardShortcuts.onKeyUp(for: .log) {
             AppDelegate.shared.actionShowLog(nil)
         }
@@ -115,7 +124,8 @@ class GlobalShortCutViewController: NSViewController {
         addGridView(in: modeBoxView, with: [
             [NSTextField(labelWithString: NSLocalizedString("Direct Mode", comment: "")), getRecoder(for: .modeDirect)],
             [NSTextField(labelWithString: NSLocalizedString("Rule Mode", comment: "")), getRecoder(for: .modeRule)],
-            [NSTextField(labelWithString: NSLocalizedString("Global Mode", comment: "")), getRecoder(for: .modeGlobal)]
+            [NSTextField(labelWithString: NSLocalizedString("Global Mode", comment: "")), getRecoder(for: .modeGlobal)],
+            [NSTextField(labelWithString: NSLocalizedString("Enhanced Mode", comment: "")), getRecoder(for: .toggleEnhancedMode)]
         ])
 
         var otherItems: [[NSView]] = [

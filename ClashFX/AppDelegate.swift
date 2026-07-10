@@ -361,6 +361,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         proxyModeDirectMenuItem.setShortcut(for: .modeDirect)
         proxyModeRuleMenuItem.setShortcut(for: .modeRule)
         proxyModeGlobalMenuItem.setShortcut(for: .modeGlobal)
+        enhancedModeMenuItem.setShortcut(for: .toggleEnhancedMode)
         showLogMenuItem.setShortcut(for: .log)
         dashboardMenuItem.setShortcut(for: .dashboard)
         connectionsMenuItem.setShortcut(for: .nativeDashboard)
@@ -1240,7 +1241,7 @@ extension AppDelegate {
         }
     }
 
-    @IBAction func actionToggleEnhancedMode(_ sender: NSMenuItem) {
+    @IBAction func actionToggleEnhancedMode(_ sender: NSMenuItem?) {
         let newState = !Settings.enhancedMode
         guard ConfigManager.shared.isRunning else { return }
         enhancedModeMenuItem.isEnabled = false

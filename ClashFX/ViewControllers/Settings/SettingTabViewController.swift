@@ -9,7 +9,6 @@
 import Cocoa
 
 class SettingsSidebarViewController: NSViewController {
-    private let minimumContentSize = NSSize(width: 900, height: 500)
     private let preferredContent = NSSize(width: 900, height: 620)
     private let visibleFrameMargin: CGFloat = 16
     private let sidebarWidth: CGFloat = 176
@@ -58,12 +57,17 @@ class SettingsSidebarViewController: NSViewController {
         window.styleMask.remove(.resizable)
 
         let visibleFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
-        let maxVisibleHeight = visibleFrame.map { max(minimumContentSize.height, $0.height - visibleFrameMargin * 2) }
-            ?? preferredContent.height
-        let fixedContentSize = NSSize(
-            width: preferredContent.width,
-            height: min(preferredContent.height, maxVisibleHeight)
-        )
+        let fixedContentSize: NSSize
+        if let visibleFrame {
+            let safeFrame = visibleFrame.insetBy(dx: visibleFrameMargin, dy: visibleFrameMargin)
+            let availableContentSize = window.contentRect(forFrameRect: safeFrame).size
+            fixedContentSize = NSSize(
+                width: min(preferredContent.width, availableContentSize.width),
+                height: min(preferredContent.height, availableContentSize.height)
+            )
+        } else {
+            fixedContentSize = preferredContent
+        }
 
         preferredContentSize = fixedContentSize
         window.contentMinSize = fixedContentSize
@@ -345,7 +349,7 @@ private final class SettingsSidebarRowView: NSControl {
 
 private final class SettingsPageHostViewController: NSViewController {
     private let contentViewController: NSViewController
-    private let pageInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
+    private let pageInsets = NSEdgeInsets(top: 24, left: 24, bottom: 40, right: 24)
 
     init(contentViewController: NSViewController) {
         self.contentViewController = contentViewController
