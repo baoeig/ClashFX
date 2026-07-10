@@ -16,11 +16,11 @@ extension KeyboardShortcuts.Name {
     )
     static let copyShellCommand = Self(
         "shortCut.copyShellCommand",
-        default: .init(.c, modifiers: .command)
+        default: .init(.c, modifiers: [.control, .option])
     )
     static let copyExternalShellCommand = Self(
         "shortCut.copyExternalShellCommand",
-        default: .init(.c, modifiers: [.command, .option])
+        default: .init(.c, modifiers: [.control, .option, .shift])
     )
 
     static let modeDirect = Self(
@@ -57,7 +57,11 @@ extension KeyboardShortcuts.Name {
 }
 
 enum KeyboardShortCutManager {
+    private static let copyShortcutMigrationKey = "kCopyShortcutMigrationV2"
+
     static func setup() {
+        migrateUnsafeCopyShortcutsIfNeeded()
+
         KeyboardShortcuts.onKeyUp(for: .toggleSystemProxyMode) {
             AppDelegate.shared.actionSetSystemProxy(nil)
         }
@@ -102,6 +106,39 @@ enum KeyboardShortCutManager {
                 ClashWindowController<DashboardViewController>.create().showWindow(self)
             }
         }
+    }
+
+    private static func migrateUnsafeCopyShortcutsIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: copyShortcutMigrationKey) else { return }
+
+        let legacyCopy = KeyboardShortcuts.Shortcut(.c, modifiers: .command)
+        let legacyExternalCopy = KeyboardShortcuts.Shortcut(.c, modifiers: [.command, .option])
+        var migrated = false
+
+        if KeyboardShortcuts.getShortcut(for: .copyShellCommand) == legacyCopy {
+            KeyboardShortcuts.setShortcut(
+                KeyboardShortcuts.Shortcut(.c, modifiers: [.control, .option]),
+                for: .copyShellCommand
+            )
+            migrated = true
+        }
+
+        if KeyboardShortcuts.getShortcut(for: .copyExternalShellCommand) == legacyExternalCopy {
+            KeyboardShortcuts.setShortcut(
+                KeyboardShortcuts.Shortcut(.c, modifiers: [.control, .option, .shift]),
+                for: .copyExternalShellCommand
+            )
+            migrated = true
+        }
+
+        UserDefaults.standard.set(true, forKey: copyShortcutMigrationKey)
+        guard migrated else { return }
+
+        Logger.log("Migrated unsafe copy shortcuts away from Command-C")
+        NSUserNotificationCenter.default.post(
+            title: NSLocalizedString("Global Shortcut Updated", comment: ""),
+            info: NSLocalizedString("Copy shortcuts were changed to avoid intercepting Command-C. You can customize them in Settings > Global Shortcut.", comment: "")
+        )
     }
 }
 

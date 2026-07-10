@@ -42,10 +42,10 @@
                         <rect key="frame" x="0.0" y="0.0" width="400" height="674"/>
                         <autoresizingMask key="autoresizingMask"/>
                         <subviews>
-                            <stackView distribution="fill" orientation="vertical" alignment="leading" spacing="10" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="VYa-DX-JOe">
+                            <stackView distribution="fill" orientation="vertical" alignment="leading" spacing="30" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="VYa-DX-JOe">
                                 <rect key="frame" x="20" y="20" width="432" height="634"/>
                                 <subviews>
-                                    <box borderType="line" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="Gnh-m8-PAz">
+                                    <box borderType="line" title="Application Settings" translatesAutoresizingMaskIntoConstraints="NO" id="Gnh-m8-PAz" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                         <rect key="frame" x="-3" y="540" width="438" height="96"/>
                                         <view key="contentView" id="Lai-8r-q7z">
                                             <rect key="frame" x="4" y="5" width="430" height="88"/>
@@ -96,7 +96,7 @@
                                             </constraints>
                                         </view>
                                     </box>
-                                    <box title="Clash Settings (restart app to take effect)" translatesAutoresizingMaskIntoConstraints="NO" id="bcR-rG-52F">
+                                    <box title="Clash Settings (restart app to take effect)" translatesAutoresizingMaskIntoConstraints="NO" id="bcR-rG-52F" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                         <rect key="frame" x="-3" y="374" width="438" height="160"/>
                                         <view key="contentView" id="baR-Ra-RV2">
                                             <rect key="frame" x="4" y="5" width="430" height="140"/>
@@ -262,7 +262,7 @@
                                             </constraints>
                                         </view>
                                     </box>
-                                    <box borderType="line" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="F94-On-Zm0">
+                                    <box borderType="line" title="Network Automation" translatesAutoresizingMaskIntoConstraints="NO" id="F94-On-Zm0" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                         <rect key="frame" x="-3" y="281" width="438" height="89"/>
                                         <view key="contentView" id="icq-Gs-lyb">
                                             <rect key="frame" x="4" y="5" width="430" height="81"/>
@@ -328,7 +328,7 @@
                                             </constraints>
                                         </view>
                                     </box>
-                                    <box borderType="line" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="BeT-cl-vgr">
+                                    <box borderType="line" title="Connectivity Test" translatesAutoresizingMaskIntoConstraints="NO" id="BeT-cl-vgr" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                         <rect key="frame" x="-3" y="209" width="438" height="68"/>
                                         <view key="contentView" id="kkS-1K-s09">
                                             <rect key="frame" x="4" y="5" width="430" height="60"/>
@@ -391,7 +391,7 @@
                                             </constraints>
                                         </view>
                                     </box>
-                                    <box borderType="line" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="hnq-VC-kO5">
+                                    <box borderType="line" title="Bypass Rules" translatesAutoresizingMaskIntoConstraints="NO" id="hnq-VC-kO5" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                         <rect key="frame" x="-3" y="-4" width="438" height="374"/>
                                         <view key="contentView" id="Xgo-Uz-aYp">
                                             <rect key="frame" x="4" y="5" width="430" height="366"/>
@@ -1732,7 +1732,7 @@
                         <rect key="frame" x="0.0" y="0.0" width="416" height="412"/>
                         <autoresizingMask key="autoresizingMask"/>
                         <subviews>
-                            <box title="Debug Setting" translatesAutoresizingMaskIntoConstraints="NO" id="NLT-FZ-48V">
+                            <box title="Debug Setting" translatesAutoresizingMaskIntoConstraints="NO" id="NLT-FZ-48V" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                 <rect key="frame" x="17" y="21" width="382" height="392"/>
                                 <view key="contentView" id="JPj-NU-Cwp">
                                     <rect key="frame" x="4" y="5" width="374" height="372"/>
@@ -2068,24 +2068,24 @@
                         <rect key="frame" x="0.0" y="0.0" width="507" height="414"/>
                         <autoresizingMask key="autoresizingMask"/>
                         <subviews>
-                            <stackView distribution="fill" orientation="vertical" alignment="leading" spacing="20" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Y2e-mg-7Hh">
+                            <stackView distribution="fill" orientation="vertical" alignment="leading" spacing="30" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Y2e-mg-7Hh">
                                 <rect key="frame" x="20" y="20" width="467" height="374"/>
                                 <subviews>
-                                    <box ambiguous="YES" title="Proxy" translatesAutoresizingMaskIntoConstraints="NO" id="BFE-Qq-B2H">
+                                    <box ambiguous="YES" title="Proxy" translatesAutoresizingMaskIntoConstraints="NO" id="BFE-Qq-B2H" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                         <rect key="frame" x="-3" y="118" width="473" height="256"/>
                                         <view key="contentView" ambiguous="YES" id="zD3-a4-GtN">
                                             <rect key="frame" x="4" y="5" width="465" height="236"/>
                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                         </view>
                                     </box>
-                                    <box ambiguous="YES" title="Mode" translatesAutoresizingMaskIntoConstraints="NO" id="1d5-NL-UsJ">
+                                    <box ambiguous="YES" title="Mode" translatesAutoresizingMaskIntoConstraints="NO" id="1d5-NL-UsJ" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                         <rect key="frame" x="-3" y="82" width="473" height="20"/>
                                         <view key="contentView" ambiguous="YES" id="kTK-fR-GhL">
                                             <rect key="frame" x="4" y="5" width="465" height="0.0"/>
                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                         </view>
                                     </box>
-                                    <box ambiguous="YES" title="Other" translatesAutoresizingMaskIntoConstraints="NO" id="AMT-oc-r8A" userLabel="Other">
+                                    <box ambiguous="YES" title="Other" translatesAutoresizingMaskIntoConstraints="NO" id="AMT-oc-r8A" userLabel="Other" customClass="SettingsGroupBox" customModule="ClashFX" customModuleProvider="target">
                                         <rect key="frame" x="-3" y="46" width="473" height="20"/>
                                         <view key="contentView" ambiguous="YES" id="lP6-io-wrz">
                                             <rect key="frame" x="4" y="5" width="465" height="0.0"/>

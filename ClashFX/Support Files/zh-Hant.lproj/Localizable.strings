@@ -571,3 +571,9 @@
 "Settings" = "設定";
 "Global Shortcut" = "全域快捷鍵";
 "Debug" = "偵錯";
+"Application Settings" = "應用程式設定";
+"Network Automation" = "網路自動化";
+"Connectivity Test" = "連線測試";
+"Bypass Rules" = "略過規則";
+"Global Shortcut Updated" = "全域快速鍵已更新";
+"Copy shortcuts were changed to avoid intercepting Command-C. You can customize them in Settings > Global Shortcut." = "複製快速鍵已調整，避免攔截 Command-C。可在「設定 > 全域快速鍵」中自訂。";

@@ -36,7 +36,7 @@ class AppearanceSettingViewController: NSViewController {
         documentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = documentView
 
-        let trayBox = NSBox()
+        let trayBox = SettingsGroupBox()
         trayBox.translatesAutoresizingMaskIntoConstraints = false
         trayBox.title = NSLocalizedString("Tray Icon", comment: "")
 
@@ -52,7 +52,7 @@ class AppearanceSettingViewController: NSViewController {
             ])
         }
 
-        let logoBox = NSBox()
+        let logoBox = SettingsGroupBox()
         logoBox.translatesAutoresizingMaskIntoConstraints = false
         logoBox.title = NSLocalizedString("App Logo", comment: "")
 
@@ -68,7 +68,7 @@ class AppearanceSettingViewController: NSViewController {
             ])
         }
 
-        let menuBox = NSBox()
+        let menuBox = SettingsGroupBox()
         menuBox.translatesAutoresizingMaskIntoConstraints = false
         menuBox.title = NSLocalizedString("Tray Menu", comment: "")
 
@@ -105,11 +105,11 @@ class AppearanceSettingViewController: NSViewController {
             trayBox.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 20),
             trayBox.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -20),
 
-            logoBox.topAnchor.constraint(equalTo: trayBox.bottomAnchor, constant: 12),
+            logoBox.topAnchor.constraint(equalTo: trayBox.bottomAnchor, constant: 30),
             logoBox.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 20),
             logoBox.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -20),
 
-            menuBox.topAnchor.constraint(equalTo: logoBox.bottomAnchor, constant: 12),
+            menuBox.topAnchor.constraint(equalTo: logoBox.bottomAnchor, constant: 30),
             menuBox.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 20),
             menuBox.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -20),
 

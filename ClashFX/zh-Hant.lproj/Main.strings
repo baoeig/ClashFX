@@ -167,7 +167,7 @@
 "GGx-F2-7kE.title" = "請確保解決任何潛在的快捷方式衝突，全局快捷方式優先於常規快捷方式";
 
 /* Class = "NSBox"; title = "Box"; ObjectID = "Gnh-m8-PAz"; */
-"Gnh-m8-PAz.title" = "盒子";
+"Gnh-m8-PAz.title" = "應用程式設定";
 
 /* Class = "NSTabViewController"; title = "Settings"; ObjectID = "LAj-p8-9gd"; */
 "LAj-p8-9gd.title" = "ClashFX 設定";

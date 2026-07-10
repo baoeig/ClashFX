@@ -578,3 +578,9 @@
 "Settings" = "Settings";
 "Global Shortcut" = "Shortcuts";
 "Debug" = "Debug";
+"Application Settings" = "Application Settings";
+"Network Automation" = "Network Automation";
+"Connectivity Test" = "Connectivity Test";
+"Bypass Rules" = "Bypass Rules";
+"Global Shortcut Updated" = "Global Shortcut Updated";
+"Copy shortcuts were changed to avoid intercepting Command-C. You can customize them in Settings > Global Shortcut." = "Copy shortcuts were changed to avoid intercepting Command-C. You can customize them in Settings > Global Shortcut.";

@@ -1,22 +1,22 @@
 ### Bug Fixes
 
-- **Settings Stays Inside the Active Screen** — The fixed Settings window now derives its size from the active display's visible work area, including the title bar, so it remains above the Dock on smaller or third-party displays. Extra page-bottom space also keeps the final section fully reachable. (#129)
-- **Enhanced Mode Has a Real Global Shortcut** — Enhanced Mode is now registered as a configurable global shortcut instead of a ClashFX-only menu shortcut. Its new default is Control-Option-E, avoiding the former Command-Shift-E conflict with Xcode. (#129)
+- **Settings Section Headers Are Clearer** — Section headers now sit above their cards with consistent spacing, use a distinct secondary style, and no longer clip or run into the preceding section. General settings also adds meaningful headers for application, network automation, connectivity test, and bypass-rule sections. (#129)
+- **Copy Shortcuts No Longer Intercept Command-C** — The two copy-command shortcuts now default to Control-Option-C and Control-Option-Shift-C. Existing Command-C and Option-Command-C bindings are migrated automatically once so normal system copy works again. (#129)
 
 ### Contributors
 
-- @a51095 — Reported the external-display layout clipping and Enhanced Mode shortcut conflict. (#129)
+- @a51095 — Reported settings section-header layout issues and the Command-C shortcut conflict. (#129)
 
 ---
 
 ### 修复
 
-- **设置窗口会适配当前显示器可用区域** — 固定尺寸的“更多设置”现在会按当前显示器的可用工作区（含标题栏）计算窗口大小；在较小或第三方显示器上也会避开 Dock。页面底部额外留白，最后一个分组可完整滚动到位。 (#129)
-- **增强模式改为真正的全局快捷键** — 增强模式不再只是 ClashFX 前台时可用的菜单快捷键，现已注册为可配置的全局快捷键；默认改为 `Control-Option-E`，避开原有 `Command-Shift-E` 与 Xcode 的冲突。 (#129)
+- **设置分组标题更清晰** — 分组标题现在会在卡片上方保留统一间距，采用与内容不同的次级样式，不再被裁切或紧贴上一分区。通用设置还补充了应用设置、网络自动化、连通性测试和绕过规则等标题。 (#129)
+- **复制快捷键不再拦截 Command-C** — 两个复制代理命令的默认快捷键分别调整为 `Control-Option-C` 与 `Control-Option-Shift-C`；已保存的 `Command-C` 和 `Option-Command-C` 会在升级后自动迁移一次，恢复系统普通复制。 (#129)
 
 ### 贡献者
 
-- @a51095 — 反馈第三方显示器下的布局裁切和增强模式快捷键冲突问题。 (#129)
+- @a51095 — 反馈设置分组标题布局及 Command-C 快捷键冲突问题。 (#129)
 
 <!-- Previous release notes -->
 

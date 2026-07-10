@@ -224,7 +224,7 @@
 "yXh-2Y-aTS.title" = "重置";
 
 /* Class = "NSBox"; title = "Box"; ObjectID = "Gnh-m8-PAz"; */
-"Gnh-m8-PAz.title" = "Box";
+"Gnh-m8-PAz.title" = "应用设置";
 
 /* Class = "NSTextFieldCell"; title = "SSID Suspend"; ObjectID = "F1s-SF-dqX"; */
 "F1s-SF-dqX.title" = "在特定 WiFi SSID 下自动暂停";

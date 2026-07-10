@@ -8,6 +8,43 @@
 
 import Cocoa
 
+@objc(SettingsGroupBox)
+final class SettingsGroupBox: NSBox {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configureTitleLayout()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureTitleLayout()
+    }
+
+    override var titleRect: NSRect {
+        var rect = super.titleRect
+        guard titlePosition != .noTitle else { return rect }
+
+        // Keep section headers distinct from and clear of their cards.
+        rect.origin.y += 6
+        rect.size.height += 4
+        return rect
+    }
+
+    override func awakeFromNib() {
+        super.awakeFromNib()
+        if !title.isEmpty {
+            title = NSLocalizedString(title, comment: "")
+        }
+        configureTitleLayout()
+    }
+
+    private func configureTitleLayout() {
+        titlePosition = .aboveTop
+        titleFont = .systemFont(ofSize: 12, weight: .semibold)
+        (titleCell as? NSTextFieldCell)?.textColor = .secondaryLabelColor
+    }
+}
+
 class SettingsSidebarViewController: NSViewController {
     private let preferredContent = NSSize(width: 900, height: 620)
     private let visibleFrameMargin: CGFloat = 16

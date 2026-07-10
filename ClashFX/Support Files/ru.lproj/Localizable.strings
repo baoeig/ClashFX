@@ -571,3 +571,9 @@
 "Settings" = "Настройки";
 "Global Shortcut" = "Сочетания";
 "Debug" = "Отладка";
+"Application Settings" = "Настройки приложения";
+"Network Automation" = "Автоматизация сети";
+"Connectivity Test" = "Проверка подключения";
+"Bypass Rules" = "Правила обхода";
+"Global Shortcut Updated" = "Глобальные сочетания обновлены";
+"Copy shortcuts were changed to avoid intercepting Command-C. You can customize them in Settings > Global Shortcut." = "Сочетания для копирования изменены, чтобы не перехватывать Command-C. Их можно настроить в «Настройки > Глобальные сочетания».";

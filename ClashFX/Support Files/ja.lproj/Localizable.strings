@@ -571,3 +571,9 @@
 "Settings" = "設定";
 "Global Shortcut" = "ショートカット";
 "Debug" = "デバッグ";
+"Application Settings" = "アプリ設定";
+"Network Automation" = "ネットワーク自動化";
+"Connectivity Test" = "接続テスト";
+"Bypass Rules" = "バイパスルール";
+"Global Shortcut Updated" = "グローバルショートカットを更新しました";
+"Copy shortcuts were changed to avoid intercepting Command-C. You can customize them in Settings > Global Shortcut." = "Command-C を横取りしないよう、コピーのショートカットを変更しました。設定 > グローバルショートカットで変更できます。";
