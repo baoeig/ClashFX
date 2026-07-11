@@ -452,7 +452,9 @@
 "Reload Config" = "Перезагрузить конфигурацию";
 
 /* No comment provided by engineer. */
-"Update External Resources" = "Обновить внешние ресурсы";
+"Update Rule and Proxy Resources" = "Обновить правила и ресурсы прокси";
+
+"Config Patch (Profile Mixin)" = "Патч конфигурации (Profile Mixin)";
 
 /* No comment provided by engineer. */
 "Remote Config" = "Удалённая конфигурация";

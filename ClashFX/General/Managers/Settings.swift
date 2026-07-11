@@ -217,15 +217,6 @@ enum Settings {
         }
     }
 
-    @UserDefault("lastDelayBenchmarkConfig", defaultValue: "")
-    static var lastDelayBenchmarkConfig: String
-
-    @UserDefault("lastDelayBenchmarkURL", defaultValue: defaultBenchmarkUrl)
-    static var lastDelayBenchmarkURL: String
-
-    @UserDefault("lastDelayBenchmarkTimeout", defaultValue: 5000)
-    static var lastDelayBenchmarkTimeout: Int
-
     @UserDefault("hideDockIcon", defaultValue: false)
     static var hideDockIcon: Bool
 

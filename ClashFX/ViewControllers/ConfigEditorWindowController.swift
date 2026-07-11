@@ -15,7 +15,7 @@ class ConfigEditorWindowController: NSWindowController {
 
     private static var openWindows: [String: ConfigEditorWindowController] = [:]
     private static let currentConfigWindowKey = "__current_config__"
-    private static let profileMixinTitle = "Profile Mixin"
+    private static let profileMixinTitle = NSLocalizedString("Config Patch (Profile Mixin)", comment: "")
 
     static func show(configPath: String? = nil) {
         let key = configPath ?? currentConfigWindowKey

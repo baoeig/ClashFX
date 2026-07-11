@@ -1,5 +1,29 @@
 ### Bug Fixes
 
+- **Delay Tests Stay Manual** — Removed the startup retry for delay tests. Benchmarks now run only when explicitly started by the user, avoiding extra network requests while ClashFX and its configuration are still starting. (#147)
+- **Config Menu Is Clearer** — Renamed Profile Mixin to Config Patch (Profile Mixin), grouped it with Config Editor and current-config actions, and renamed external-resource updates to clarify that they refresh rule and proxy providers rather than managed configurations. (#147)
+
+### Contributors
+
+- @a51095 — Reported the startup delay-test behavior and the unclear configuration menu labels. (#147)
+
+---
+
+### 修复
+
+- **延迟测速保持手动执行** — 移除启动后的延迟测速重试；测速只在用户手动发起时执行，避免 ClashFX 和配置刚启动时产生额外网络请求。 (#147)
+- **配置菜单更清晰** — 将 Profile Mixin 更名为“配置补丁（Profile Mixin）”，与配置编辑器和当前配置操作归组；同时将外部资源更新明确为规则与代理提供者资源更新，避免与托管配置混淆。 (#147)
+
+### 贡献者
+
+- @a51095 — 反馈启动后延迟测速行为及配置菜单文案不清晰的问题。 (#147)
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **Config Selection Follows Local and iCloud Storage** — Local and iCloud storage now remember their selected configurations independently. Switching storage restores the target location's previous selection, or chooses a non-default configuration when no selection has been saved yet. (#129)
 - **Delay Results Return After Restart** — After a manual delay benchmark, ClashFX remembers the active configuration and test parameters, then silently repeats the benchmark once after the next matching startup. (#147)
 - **Proxy Speed Is Clearly Labeled** — The menu-bar indicator now identifies itself as ClashFX proxy traffic and explains that it does not represent total system network speed. (#147)

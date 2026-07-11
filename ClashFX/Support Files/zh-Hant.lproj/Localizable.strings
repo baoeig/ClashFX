@@ -452,7 +452,9 @@
 "Reload Config" = "重載配置文件";
 
 /* No comment provided by engineer. */
-"Update External Resources" = "更新外部資源";
+"Update Rule and Proxy Resources" = "更新規則與代理資源";
+
+"Config Patch (Profile Mixin)" = "設定補丁（Profile Mixin）";
 
 /* No comment provided by engineer. */
 "Remote Config" = "託管配置";

@@ -452,7 +452,9 @@
 "Reload Config" = "設定を再読み込み";
 
 /* No comment provided by engineer. */
-"Update External Resources" = "外部リソースを更新";
+"Update Rule and Proxy Resources" = "ルールとプロキシのリソースを更新";
+
+"Config Patch (Profile Mixin)" = "設定パッチ（Profile Mixin）";
 
 /* No comment provided by engineer. */
 "Remote Config" = "リモート設定";

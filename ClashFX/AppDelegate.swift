@@ -46,6 +46,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBOutlet var separatorLineTop: NSMenuItem!
     @IBOutlet var sepatatorLineEndProxySelect: NSMenuItem!
     @IBOutlet var configSeparatorLine: NSMenuItem!
+    @IBOutlet var configRemoteResourcesSeparator: NSMenuItem!
     @IBOutlet var logLevelMenuItem: NSMenuItem!
     @IBOutlet var httpPortMenuItem: NSMenuItem!
     @IBOutlet var socksPortMenuItem: NSMenuItem!
@@ -100,9 +101,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     var runAfterConfigReload: (() -> Void)?
     var isConfigUpdating = false
-
-    private var didRestoreLastSpeedTest = false
-    private static let automaticSpeedTestDelay: TimeInterval = 1
 
     private var lastStreamResetTime: Date = .distantPast
     private var pendingStreamResetWork: DispatchWorkItem?
@@ -240,7 +238,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if !Settings.builtInApiMode {
                 self?.selectAllowLanWithMenory()
             }
-            self?.restoreLastSpeedTestIfNeeded()
         }
         updateConfig(showNotification: false)
         updateLoggingLevel()
@@ -340,6 +337,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func setupStatusMenuItemData() {
         showNetSpeedIndicatorMenuItem.title = NSLocalizedString("Show Proxy Speed", comment: "")
+        updateExternalResourceMenuItem.title = NSLocalizedString("Update Rule and Proxy Resources", comment: "")
         ConfigManager.shared
             .showNetSpeedIndicatorObservable
             .bind { [weak self] show in
@@ -2153,37 +2151,13 @@ extension AppDelegate {
         runSpeedTest(
             benchmarkURL: Settings.benchMarkUrl,
             timeout: 5000,
-            showNotifications: true,
-            rememberForNextLaunch: true
+            showNotifications: true
         )
-    }
-
-    private func restoreLastSpeedTestIfNeeded() {
-        guard !didRestoreLastSpeedTest else { return }
-        didRestoreLastSpeedTest = true
-
-        guard Settings.lastDelayBenchmarkConfig == ConfigManager.selectConfigName,
-              !Settings.lastDelayBenchmarkURL.isEmpty else {
-            return
-        }
-
-        let benchmarkURL = Settings.lastDelayBenchmarkURL
-        let timeout = max(Settings.lastDelayBenchmarkTimeout, 1000)
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.automaticSpeedTestDelay) { [weak self] in
-            guard Settings.lastDelayBenchmarkConfig == ConfigManager.selectConfigName else { return }
-            self?.runSpeedTest(
-                benchmarkURL: benchmarkURL,
-                timeout: timeout,
-                showNotifications: false,
-                rememberForNextLaunch: false
-            )
-        }
     }
 
     private func runSpeedTest(benchmarkURL: String,
                               timeout: Int,
-                              showNotifications: Bool,
-                              rememberForNextLaunch: Bool) {
+                              showNotifications: Bool) {
         if isSpeedTesting {
             if showNotifications {
                 NSUserNotificationCenter.default.postSpeedTestingNotice()
@@ -2192,12 +2166,6 @@ extension AppDelegate {
         }
         if showNotifications {
             NSUserNotificationCenter.default.postSpeedTestBeginNotice()
-        }
-
-        if rememberForNextLaunch {
-            Settings.lastDelayBenchmarkConfig = ConfigManager.selectConfigName
-            Settings.lastDelayBenchmarkURL = benchmarkURL
-            Settings.lastDelayBenchmarkTimeout = timeout
         }
 
         isSpeedTesting = true
@@ -2401,7 +2369,7 @@ extension AppDelegate {
     func setupProfileMixinMenuItem() {
         guard let configMenu = configSeparatorLine.menu else { return }
         let item = NSMenuItem(
-            title: NSLocalizedString("Profile Mixin", comment: ""),
+            title: NSLocalizedString("Config Patch (Profile Mixin)", comment: ""),
             action: #selector(actionOpenProfileMixinEditor(_:)),
             keyEquivalent: ""
         )
@@ -2805,6 +2773,14 @@ extension AppDelegate {
         updateExternalResourceMenuItem.isHidden = !(showConfigs && Settings.trayMenuShowUpdateExternal)
         remoteConfigMenuItem.isHidden = !(showConfigs && Settings.trayMenuShowRemoteConfig)
         remoteControllerMenuItem.isHidden = !(showConfigs && Settings.trayMenuShowRemoteController)
+
+        let hasCurrentConfigActions = Settings.trayMenuShowConfigEditor
+            || Settings.trayMenuShowProfileMixin
+            || Settings.trayMenuShowOpenConfigFolder
+            || Settings.trayMenuShowReloadConfig
+        let hasRemoteResourceActions = Settings.trayMenuShowUpdateExternal
+            || Settings.trayMenuShowRemoteConfig
+        configRemoteResourcesSeparator.isHidden = !(showConfigs && hasCurrentConfigActions && hasRemoteResourceActions)
 
         // Dynamic config switch items (at top of Configs submenu, before configSeparatorLine)
         applyConfigSwitcherVisibility(showConfigSwitcher: showConfigs && Settings.trayMenuShowConfigSwitcher)

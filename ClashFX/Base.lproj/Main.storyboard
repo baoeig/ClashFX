@@ -767,6 +767,7 @@
                         <outlet property="autoStartMenuItem" destination="B1J-XB-BiZ" id="xaS-h5-qd0"/>
                         <outlet property="checkForUpdateMenuItem" destination="p0T-J8-Emx" id="9BN-2j-QNB"/>
                         <outlet property="configSeparatorLine" destination="WzG-og-OyZ" id="hhn-AP-zKJ"/>
+                        <outlet property="configRemoteResourcesSeparator" destination="cfg-Sub-Sep" id="cfg-Sub-Sep-outlet"/>
                         <outlet property="connectionsMenuItem" destination="v4s-jd-g1N" id="MXJ-IS-6uq"/>
                         <outlet property="copyExportCommandExternalMenuItem" destination="7wl-vK-5JO" id="1Lu-Tu-FJy"/>
                         <outlet property="copyExportCommandMenuItem" destination="Jmb-PK-rMW" id="tiF-vV-Sqh"/>
@@ -895,22 +896,17 @@
                             <menu key="submenu" title="Configs" id="tck-zU-JKQ">
                                 <items>
                                     <menuItem isSeparatorItem="YES" id="WzG-og-OyZ"/>
-                                    <menuItem title="Open config folder" keyEquivalent="o" id="DwE-WX-ETZ">
-                                        <connections>
-                                            <action selector="openConfigFolder:" target="Voe-Tx-rLC" id="6Ke-Bi-AAZ"/>
-                                        </connections>
-                                    </menuItem>
                                     <menuItem title="Reload config" keyEquivalent="r" id="q3G-VH-eyy">
                                         <connections>
                                             <action selector="actionUpdateConfig:" target="Voe-Tx-rLC" id="oW5-Ll-SY8"/>
                                         </connections>
                                     </menuItem>
-                                    <menuItem title="Update external resources" keyEquivalent="U" id="9g1-lW-mA8">
-                                        <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                    <menuItem title="Open config folder" keyEquivalent="o" id="DwE-WX-ETZ">
                                         <connections>
-                                            <action selector="actionUpdateExternalResource:" target="Voe-Tx-rLC" id="wYg-KO-78x"/>
+                                            <action selector="openConfigFolder:" target="Voe-Tx-rLC" id="6Ke-Bi-AAZ"/>
                                         </connections>
                                     </menuItem>
+                                    <menuItem isSeparatorItem="YES" id="cfg-Sub-Sep"/>
                                     <menuItem title="Remote config" id="h1C-R6-Y9w">
                                         <modifierMask key="keyEquivalentModifierMask"/>
                                         <menu key="submenu" title="Remote config" id="az2-wz-yyy">
@@ -939,6 +935,12 @@
                                                 </menuItem>
                                             </items>
                                         </menu>
+                                    </menuItem>
+                                    <menuItem title="Update rule and proxy resources" keyEquivalent="U" id="9g1-lW-mA8">
+                                        <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                        <connections>
+                                            <action selector="actionUpdateExternalResource:" target="Voe-Tx-rLC" id="wYg-KO-78x"/>
+                                        </connections>
                                     </menuItem>
                                     <menuItem title="Remote controller" id="BRR-WK-aeP">
                                         <modifierMask key="keyEquivalentModifierMask"/>

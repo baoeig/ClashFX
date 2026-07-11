@@ -452,7 +452,9 @@
 "Reload Config" = "Reload Config";
 
 /* No comment provided by engineer. */
-"Update External Resources" = "Update External Resources";
+"Update Rule and Proxy Resources" = "Update Rule and Proxy Resources";
+
+"Config Patch (Profile Mixin)" = "Config Patch (Profile Mixin)";
 
 /* No comment provided by engineer. */
 "Remote Config" = "Remote Config";
