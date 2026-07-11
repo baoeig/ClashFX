@@ -1154,6 +1154,7 @@ class RemoteConfigManager {
                 return
             }
 
+            let previousName = config.name
             if let suggestName = suggestedFilename, config.isPlaceHolderName {
                 let name = URL(fileURLWithPath: suggestName).deletingPathExtension().lastPathComponent
                 if !shared.configs.contains(where: { $0.name == name }) {
@@ -1162,22 +1163,43 @@ class RemoteConfigManager {
             }
             config.isPlaceHolderName = false
 
-            if ICloudManager.shared.useiCloud.value {
+            let didRenameConfig = config.name != previousName
+            let shouldRestartConfigWatcher = ICloudManager.shared.useiCloud.value ||
+                config.name == ConfigManager.selectConfigName ||
+                previousName == ConfigManager.selectConfigName
+
+            if shouldRestartConfigWatcher {
                 ConfigFileManager.shared.stopWatchConfigFile()
             }
-            if config.name == ConfigManager.selectConfigName {
+            if !didRenameConfig, config.name == ConfigManager.selectConfigName {
                 ConfigFileManager.shared.pauseForNextChange()
             }
 
-            let saveAction: ((String) -> Void) = {
-                savePath in
+            let saveAction: ((URL) -> Void) = {
+                saveURL in
                 do {
-                    if FileManager.default.fileExists(atPath: savePath) {
-                        try FileManager.default.removeItem(atPath: savePath)
+                    if FileManager.default.fileExists(atPath: saveURL.path) {
+                        try FileManager.default.removeItem(at: saveURL)
                     }
-                    try newConfig.write(to: URL(fileURLWithPath: savePath), atomically: true, encoding: .utf8)
+                    try newConfig.write(to: saveURL, atomically: true, encoding: .utf8)
+
+                    if didRenameConfig {
+                        let oldURL = saveURL.deletingLastPathComponent()
+                            .appendingPathComponent(Paths.configFileName(for: previousName))
+                        if FileManager.default.fileExists(atPath: oldURL.path) {
+                            try FileManager.default.removeItem(at: oldURL)
+                        }
+                        ConfigManager.renameConfigReferences(from: previousName, to: config.name)
+                    }
+
+                    if shouldRestartConfigWatcher {
+                        ConfigManager.watchCurrentConfigFile()
+                    }
                     complete?(nil)
                 } catch let err {
+                    if shouldRestartConfigWatcher {
+                        ConfigManager.watchCurrentConfigFile()
+                    }
                     complete?(err.localizedDescription)
                 }
             }
@@ -1186,11 +1208,10 @@ class RemoteConfigManager {
                 ICloudManager.shared.getUrl { url in
                     guard let url = url else { return }
                     let saveUrl = url.appendingPathComponent(Paths.configFileName(for: config.name))
-                    saveAction(saveUrl.path)
+                    saveAction(saveUrl)
                 }
             } else {
-                let savePath = Paths.localConfigPath(for: config.name)
-                saveAction(savePath)
+                saveAction(URL(fileURLWithPath: Paths.localConfigPath(for: config.name)))
             }
         }
     }

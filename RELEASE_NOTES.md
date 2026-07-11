@@ -1,7 +1,10 @@
 ### Bug Fixes
 
+- **iCloud Config Switching Refreshes Immediately** — Switching the iCloud config-storage option now refreshes the configuration list and reloads a valid configuration from the newly selected storage location without requiring an app restart. (#129)
+- **Remote Config Renames Keep Working** — When a subscription replaces its placeholder filename with the server-provided name, ClashFX now updates the active-config and remembered proxy references and removes the obsolete file. (#129)
 - **Settings Section Headers Are Clearer** — Section headers now sit above their cards with consistent spacing, use a distinct secondary style, and no longer clip or run into the preceding section. General settings also adds meaningful headers for application, network automation, connectivity test, and bypass-rule sections. (#129)
 - **Copy Shortcuts No Longer Intercept Command-C** — The two copy-command shortcuts now default to Control-Option-C and Control-Option-Shift-C. Existing Command-C and Option-Command-C bindings are migrated automatically once so normal system copy works again. (#129)
+- **Enhanced Mode Has a Real Global Shortcut** — Enhanced Mode now uses a configurable global shortcut with the default Control-Option-E, avoiding the earlier Command-Shift-E conflict with Xcode. (#129)
 
 ### Contributors
 
@@ -11,8 +14,11 @@
 
 ### 修复
 
+- **iCloud 配置切换立即刷新** — 切换“将配置文件存储在 iCloud 中”后，现在会立即刷新配置列表，并从新的存储位置重载可用配置，无需重启应用。 (#129)
+- **远程配置改名后仍可正常使用** — 订阅将占位文件名替换为服务端提供的名称时，ClashFX 现在会同步更新当前配置和已记忆的代理选择，并清理旧文件。 (#129)
 - **设置分组标题更清晰** — 分组标题现在会在卡片上方保留统一间距，采用与内容不同的次级样式，不再被裁切或紧贴上一分区。通用设置还补充了应用设置、网络自动化、连通性测试和绕过规则等标题。 (#129)
 - **复制快捷键不再拦截 Command-C** — 两个复制代理命令的默认快捷键分别调整为 `Control-Option-C` 与 `Control-Option-Shift-C`；已保存的 `Command-C` 和 `Option-Command-C` 会在升级后自动迁移一次，恢复系统普通复制。 (#129)
+- **增强模式拥有真正的全局快捷键** — 增强模式现已使用可配置的全局快捷键，默认 `Control-Option-E`，避开此前与 Xcode 的 `Command-Shift-E` 冲突。 (#129)
 
 ### 贡献者
 

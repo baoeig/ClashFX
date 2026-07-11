@@ -677,17 +677,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func onICloudConfigStorageDidChange() {
-        ConfigManager.watchCurrentConfigFile()
-        updateConfigFiles()
-
-        let selectedConfig = ConfigManager.selectConfigName
-        ConfigManager.getConfigPath(configName: selectedConfig) { [weak self] path in
+        ConfigManager.getActiveConfigFilesList { [weak self] configNames in
             guard let self = self else { return }
-            guard FileManager.default.fileExists(atPath: path) else {
-                Logger.log("[iCloud] Selected config \(selectedConfig) not found at \(path), skipping reload", level: .warning)
+
+            self.updateConfigFiles()
+
+            guard !configNames.isEmpty else {
+                Logger.log("[iCloud] No configs available after changing storage", level: .warning)
                 return
             }
-            self.updateConfig(configName: selectedConfig, showNotification: false)
+
+            let selectedConfig = ConfigManager.selectConfigName
+            let configToLoad: String
+            if configNames.contains(selectedConfig) {
+                configToLoad = selectedConfig
+            } else if configNames.contains("config") {
+                configToLoad = "config"
+            } else {
+                configToLoad = configNames.sorted().first!
+            }
+
+            if configToLoad != selectedConfig {
+                Logger.log("[iCloud] Selected config \(selectedConfig) is unavailable after changing storage; switching to \(configToLoad)")
+                ConfigManager.selectConfigName = configToLoad
+            } else {
+                ConfigManager.watchCurrentConfigFile()
+            }
+
+            self.updateConfig(configName: configToLoad, showNotification: false)
         }
     }
 

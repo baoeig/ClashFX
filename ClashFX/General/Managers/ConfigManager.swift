@@ -117,6 +117,23 @@ class ConfigManager {
         }
     }
 
+    /// Keeps the active config and remembered proxy selections in sync when a
+    /// remote subscription replaces its placeholder filename with the server name.
+    static func renameConfigReferences(from oldName: String, to newName: String) {
+        guard oldName != newName else { return }
+
+        if selectConfigName == oldName {
+            UserDefaults.standard.set(newName, forKey: "selectConfigName")
+        }
+
+        let renamedRecords = selectedProxyRecords.map { record in
+            guard record.config == oldName else { return record }
+            return SavedProxyModel(group: record.group, selected: record.selected, config: newName)
+        }
+        var recordKeys = Set<String>()
+        selectedProxyRecords = renamedRecords.filter { recordKeys.insert($0.key).inserted }
+    }
+
     static var selectOutBoundMode: ClashProxyMode {
         get {
             return ClashProxyMode(rawValue: UserDefaults.standard.string(forKey: "selectOutBoundMode") ?? "") ?? .rule
@@ -172,6 +189,14 @@ extension ConfigManager {
                 .map { $0.split(separator: ".").dropLast().joined(separator: ".") }
         } catch {
             return ["config"]
+        }
+    }
+
+    static func getActiveConfigFilesList(complete: @escaping (([String]) -> Void)) {
+        if ICloudManager.shared.useiCloud.value {
+            ICloudManager.shared.getConfigFilesList(configs: complete)
+        } else {
+            complete(getConfigFilesList())
         }
     }
 }
