@@ -1,5 +1,27 @@
 ### Bug Fixes
 
+- **Global Shortcuts No Longer Override Standard macOS Commands** — Removed the default global bindings for Command-S, Command-D, Command-L, and Shift-Command-D. Existing bindings that still match those former defaults are cleared once during upgrade, while other custom shortcuts remain unchanged. (#169)
+
+### Contributors
+
+- @flydog-ai — Reported and traced the unsafe default global shortcuts. (#169)
+
+---
+
+### 修复
+
+- **全局快捷键不再覆盖 macOS 常用命令** — 移除 `Command-S`、`Command-D`、`Command-L` 和 `Shift-Command-D` 的默认全局绑定；升级时会一次性清除仍与这些旧默认值相同的绑定，其他自定义快捷键保持不变。 (#169)
+
+### 贡献者
+
+- @flydog-ai — 反馈并定位了不安全的默认全局快捷键。 (#169)
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **Managed Config Table Fits Its Contents** — The managed-config window now reserves enough room for the update-time column on its first display, without requiring a manual window resize. (#147)
 - **Configurable Delay-Test Shortcut** — Delay tests can now be assigned a global shortcut in Settings. It has no default binding, so it will not conflict with existing shortcuts. (#147)
 - **iCloud Storage Fails Safely** — Enabling iCloud-backed config storage now warns and restores the local-storage setting when iCloud is unavailable. (#147)

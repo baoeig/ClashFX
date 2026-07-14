@@ -10,10 +10,7 @@ import AppKit
 import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
-    static let toggleSystemProxyMode = Self(
-        "shortCut.toggleSystemProxyMode",
-        default: .init(.s, modifiers: .command)
-    )
+    static let toggleSystemProxyMode = Self("shortCut.toggleSystemProxyMode")
     static let copyShellCommand = Self(
         "shortCut.copyShellCommand",
         default: .init(.c, modifiers: [.control, .option])
@@ -41,27 +38,20 @@ extension KeyboardShortcuts.Name {
         default: .init(.e, modifiers: [.control, .option])
     )
 
-    static let log = Self(
-        "shortCut.log",
-        default: .init(.l, modifiers: .command)
-    )
-    static let dashboard = Self(
-        "shortCut.dashboard",
-        default: .init(.d, modifiers: .command)
-    )
+    static let log = Self("shortCut.log")
+    static let dashboard = Self("shortCut.dashboard")
     static let benchmark = Self("shortCut.benchmark")
     static let openMenu = Self("shortCut.openMenu")
-    static let nativeDashboard = Self(
-        "shortCut.nativeDashboard",
-        default: .init(.d, modifiers: [.command, .shift])
-    )
+    static let nativeDashboard = Self("shortCut.nativeDashboard")
 }
 
 enum KeyboardShortCutManager {
     private static let copyShortcutMigrationKey = "kCopyShortcutMigrationV2"
+    private static let unsafeCommandShortcutMigrationKey = "kUnsafeCommandShortcutMigrationV1"
 
     static func setup() {
         migrateUnsafeCopyShortcutsIfNeeded()
+        migrateUnsafeCommandShortcutsIfNeeded()
 
         KeyboardShortcuts.onKeyUp(for: .toggleSystemProxyMode) {
             AppDelegate.shared.actionSetSystemProxy(nil)
@@ -143,6 +133,33 @@ enum KeyboardShortCutManager {
         NSUserNotificationCenter.default.post(
             title: NSLocalizedString("Global Shortcut Updated", comment: ""),
             info: NSLocalizedString("Copy shortcuts were changed to avoid intercepting Command-C. You can customize them in Settings > Global Shortcut.", comment: "")
+        )
+    }
+
+    private static func migrateUnsafeCommandShortcutsIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: unsafeCommandShortcutMigrationKey) else { return }
+
+        let unsafeShortcuts: [(KeyboardShortcuts.Name, KeyboardShortcuts.Shortcut)] = [
+            (.toggleSystemProxyMode, .init(.s, modifiers: .command)),
+            (.log, .init(.l, modifiers: .command)),
+            (.dashboard, .init(.d, modifiers: .command)),
+            (.nativeDashboard, .init(.d, modifiers: [.command, .shift]))
+        ]
+        var migrated = false
+
+        for (name, unsafeShortcut) in unsafeShortcuts
+            where KeyboardShortcuts.getShortcut(for: name) == unsafeShortcut {
+            KeyboardShortcuts.setShortcut(nil, for: name)
+            migrated = true
+        }
+
+        UserDefaults.standard.set(true, forKey: unsafeCommandShortcutMigrationKey)
+        guard migrated else { return }
+
+        Logger.log("Removed unsafe Command-key global shortcuts")
+        NSUserNotificationCenter.default.post(
+            title: NSLocalizedString("Global Shortcut Updated", comment: ""),
+            info: NSLocalizedString("Unsafe Command-key shortcuts were removed to restore standard macOS shortcuts. You can assign custom combinations in Settings > Global Shortcut.", comment: "")
         )
     }
 }
