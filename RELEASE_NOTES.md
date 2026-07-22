@@ -1,3 +1,29 @@
+### Bug Fixes
+
+- **Enhanced Mode Recovers From a Closed TUN Read Loop** — The bundled core now treats macOS `ENOTSOCK` as a closed connection, while ClashFX detects the fatal TUN read error and rebuilds Enhanced Mode instead of leaving traffic disconnected. (#147)
+- **Core Error Floods No Longer Exhaust Resources** — Repeated core messages are rate-limited in the app, and the privileged helper caps the core log at 4 MB so a broken read loop cannot drive unbounded CPU, memory, or disk usage. (#147)
+- **Helper Upgrades and Reconnects Are More Reliable** — ClashFX now reuses and safely resets its XPC connection, waits for helper readiness before cleaning stale cores, and replaces an outdated running helper before restoring Enhanced Mode. (#147)
+
+### Contributors
+
+- @a51095 — Reported the long-running Enhanced Mode disconnection and the CPU and memory spike during recovery. (#147)
+
+---
+
+### 修复
+
+- **增强模式可从 TUN 读取循环失效中恢复** — 内置核心现在会将 macOS 的 `ENOTSOCK` 识别为连接已关闭；ClashFX 检测到致命 TUN 读取错误后会重建增强模式，避免流量持续断开。 (#147)
+- **核心错误刷屏不再耗尽系统资源** — 应用会限制重复核心日志的写入频率，特权 Helper 同时将核心日志限制在 4 MB，避免异常读取循环造成 CPU、内存或磁盘占用持续增长。 (#147)
+- **Helper 升级与重连更加可靠** — ClashFX 现在会复用并安全重置 XPC 连接，等待 Helper 就绪后再清理残留核心，并在恢复增强模式前替换仍在运行的旧版 Helper。 (#147)
+
+### 贡献者
+
+- @a51095 — 反馈增强模式长时间运行后断连，以及恢复期间 CPU 和内存占用暴涨的问题。 (#147)
+
+<!-- Previous release notes -->
+
+---
+
 ### Improvements
 
 - **Delay Benchmarks Avoid Duplicate Work** — Manual delay tests now benchmark each actual leaf proxy once, use provider-specific checks for provider nodes, and cap concurrency to avoid nested policy groups producing duplicate requests and unstable first-run results. (#147)

@@ -1,6 +1,17 @@
 package main
 
-import "testing"
+import (
+	"syscall"
+	"testing"
+
+	E "github.com/metacubex/sing/common/exceptions"
+)
+
+func TestClosedTunSocketIsTreatedAsClosed(t *testing.T) {
+	if !E.IsClosed(syscall.ENOTSOCK) {
+		t.Fatal("ENOTSOCK must stop the Darwin TUN read loop")
+	}
+}
 
 func TestSplitTunRouteExcludeEntriesAcceptsLocalhost(t *testing.T) {
 	prefixes, domains, invalid := splitTunRouteExcludeEntries("127.0.0.1, localhost, *.local, +.example.com")

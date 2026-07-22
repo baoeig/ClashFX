@@ -3,6 +3,7 @@ import datetime
 import plistlib
 import os
 import filecmp
+from core_overlay import core_modfile
 
 
 def get_version():
@@ -18,11 +19,12 @@ def get_version():
 
 
 go_bin = "go"
+go_modfile = ""
 
 
 def build_clash(version, build_time, arch):
     command = f"""
-{go_bin} build -trimpath -tags with_gvisor -ldflags '-X "github.com/metacubex/mihomo/constant.Version={version}" \
+{go_bin} build -modfile='{go_modfile}' -trimpath -tags with_gvisor -ldflags '-X "github.com/metacubex/mihomo/constant.Version={version}" \
 -X "github.com/metacubex/mihomo/constant.BuildTime={build_time}"' \
 -buildmode=c-archive -o goClash_{arch}.a """
     envs = os.environ.copy()
@@ -48,7 +50,7 @@ def mergeLibs():
 
 def build_mihomo_bin(version, build_time, arch):
     command = f"""
-{go_bin} build -trimpath -tags with_gvisor -ldflags '-X "github.com/metacubex/mihomo/constant.Version={version}" \
+{go_bin} build -modfile='{go_modfile}' -trimpath -tags with_gvisor -ldflags '-X "github.com/metacubex/mihomo/constant.Version={version}" \
 -X "github.com/metacubex/mihomo/constant.BuildTime={build_time}"' \
 -o mihomo_core_{arch} ./mihomo-bin/ """
     envs = os.environ.copy()
@@ -91,25 +93,32 @@ def write_to_info(version):
 
 
 def run():
+    global go_modfile
     version = get_version()
     print("current clash version:", version)
     build_time = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
-    print("clean existing")
-    subprocess.check_output("rm -f *Clash*.h *.a mihomo_core_*", shell=True)
-    print("create arm64 library")
-    build_clash(version, build_time, "arm64")
-    print("create amd64 library")
-    build_clash(version, build_time, "amd64")
-    print("merge libraries")
-    mergeLibs()
-    print("create arm64 mihomo-bin")
-    build_mihomo_bin(version, build_time, "arm64")
-    print("create amd64 mihomo-bin")
-    build_mihomo_bin(version, build_time, "amd64")
-    print("merge and codesign mihomo-bin")
-    mergeMihomoBins()
-    print("clean")
-    clean()
+    with core_modfile() as modfile:
+        go_modfile = modfile
+        print("verify core workaround and Go tests")
+        subprocess.check_output(
+            [go_bin, "test", f"-modfile={go_modfile}", "./..."],
+        )
+        print("clean existing")
+        subprocess.check_output("rm -f *Clash*.h *.a mihomo_core_*", shell=True)
+        print("create arm64 library")
+        build_clash(version, build_time, "arm64")
+        print("create amd64 library")
+        build_clash(version, build_time, "amd64")
+        print("merge libraries")
+        mergeLibs()
+        print("create arm64 mihomo-bin")
+        build_mihomo_bin(version, build_time, "arm64")
+        print("create amd64 mihomo-bin")
+        build_mihomo_bin(version, build_time, "amd64")
+        print("merge and codesign mihomo-bin")
+        mergeMihomoBins()
+        print("clean")
+        clean()
     if os.environ.get("CI", False) or os.environ.get("GITHUB_ACTIONS", False):
         print("writing info.plist")
         write_to_info(version)

@@ -18,7 +18,7 @@ class PrivilegedHelperManager {
 
     private var authRef: AuthorizationRef?
     private var connection: NSXPCConnection?
-    private var _helper: ProxyConfigRemoteProcessProtocol?
+    private let connectionLock = NSLock()
     static let machServiceName = "com.clashfx.app.Helper"
     static let shared = PrivilegedHelperManager()
     init() {
@@ -68,9 +68,14 @@ class PrivilegedHelperManager {
     }
 
     func resetConnection() {
-        connection?.invalidate()
+        connectionLock.lock()
+        let staleConnection = connection
         connection = nil
-        _helper = nil
+        connectionLock.unlock()
+
+        staleConnection?.invalidationHandler = nil
+        staleConnection?.interruptionHandler = nil
+        staleConnection?.invalidate()
     }
 
     private func initAuthorizationRef() {
@@ -131,17 +136,53 @@ class PrivilegedHelperManager {
     }
 
     func helper(failture: (() -> Void)? = nil) -> ProxyConfigRemoteProcessProtocol? {
-        connection = NSXPCConnection(machServiceName: PrivilegedHelperManager.machServiceName, options: NSXPCConnection.Options.privileged)
-        connection?.remoteObjectInterface = NSXPCInterface(with: ProxyConfigRemoteProcessProtocol.self)
-        connection?.invalidationHandler = {
-            Logger.log("XPC Connection Invalidated")
+        connectionLock.lock()
+        let activeConnection: NSXPCConnection
+        if let connection {
+            activeConnection = connection
+        } else {
+            let newConnection = NSXPCConnection(
+                machServiceName: PrivilegedHelperManager.machServiceName,
+                options: .privileged
+            )
+            newConnection.remoteObjectInterface = NSXPCInterface(
+                with: ProxyConfigRemoteProcessProtocol.self
+            )
+            connection = newConnection
+            newConnection.invalidationHandler = { [weak self, weak newConnection] in
+                Logger.log("XPC Connection Invalidated", level: .warning)
+                self?.clearConnectionIfCurrent(newConnection)
+            }
+            newConnection.interruptionHandler = { [weak self, weak newConnection] in
+                Logger.log("XPC Connection Interrupted", level: .warning)
+                self?.clearConnectionIfCurrent(newConnection)
+            }
+            newConnection.resume()
+            activeConnection = newConnection
         }
-        connection?.resume()
-        guard let helper = connection?.remoteObjectProxyWithErrorHandler({ error in
-            Logger.log("Helper connection was closed with error: \(error)")
+        connectionLock.unlock()
+
+        guard let helper = activeConnection.remoteObjectProxyWithErrorHandler({
+            [weak self, weak activeConnection] error in
+            Logger.log("Helper connection was closed with error: \(error)", level: .warning)
+            self?.clearConnectionIfCurrent(activeConnection)
             failture?()
-        }) as? ProxyConfigRemoteProcessProtocol else { return nil }
+        }) as? ProxyConfigRemoteProcessProtocol else {
+            clearConnectionIfCurrent(activeConnection)
+            activeConnection.invalidate()
+            return nil
+        }
         return helper
+    }
+
+    private func clearConnectionIfCurrent(_ candidate: NSXPCConnection?) {
+        connectionLock.lock()
+        guard connection === candidate else {
+            connectionLock.unlock()
+            return
+        }
+        connection = nil
+        connectionLock.unlock()
     }
 
     var timer: Timer?
@@ -202,28 +243,43 @@ class PrivilegedHelperManager {
             finish(.noFound)
         }
 
-        let h = helper()
-        h?.getVersion { installedHelperVersion in
+        guard let h = helper() else {
+            finish(.noFound)
+            return
+        }
+        h.getVersion { [weak self] installedHelperVersion in
             Logger.log("helper version \(installedHelperVersion ?? "nil") require version \(helperVersion)", level: .debug)
             Logger.log("check helper using time: \(Date().timeIntervalSince(time))")
             guard let installedHelperVersion else {
                 finish(.needUpdate)
                 return
             }
-            if installedHelperVersion == helperVersion {
-                finish(.installed)
-                return
-            }
             let cmp = Self.compareVersion(installedHelperVersion, Self.firstHelperProtocolVersion)
             guard cmp != .orderedAscending else {
                 Logger.log("old helper \(installedHelperVersion) predates protocol versioning; needUpdate", level: .debug)
+                self?.resetConnection()
                 finish(.needUpdate)
                 return
             }
-            h?.getHelperProtocolVersion? { installedProtocolVersion in
+            h.getHelperProtocolVersion? { [weak self] installedProtocolVersion in
                 let expected = UInt(CLASHFX_HELPER_PROTOCOL_VERSION)
                 Logger.log("helper protocol v\(installedProtocolVersion) expect v\(expected)", level: .debug)
-                finish(installedProtocolVersion == expected ? .installed : .needUpdate)
+                guard installedProtocolVersion != expected else {
+                    finish(.installed)
+                    return
+                }
+
+                // A running legacy helper keeps its old executable and XPC
+                // interface even after the on-disk tool is replaced. Stop its
+                // managed core and release the connection before installing
+                // the new protocol version so launchd can start the new helper.
+                h.stopMihomoCore { error in
+                    if let error {
+                        Logger.log("Failed to stop core before helper upgrade: \(error)", level: .warning)
+                    }
+                    self?.resetConnection()
+                    finish(.needUpdate)
+                }
             }
         }
     }
@@ -248,6 +304,11 @@ extension PrivilegedHelperManager {
 
         let result = installHelperDaemon()
         if case .success = result {
+            if !cancelInstallCheck {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.checkInstall()
+                }
+            }
             return
         }
 
@@ -286,7 +347,6 @@ extension PrivilegedHelperManager {
             return true
         case .alertThirdButtonReturn:
             cancelInstallCheck = true
-            isHelperCheckFinished.accept(true)
             Logger.log("cancelInstallCheck = true", level: .error)
             return true
         default:

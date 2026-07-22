@@ -13,7 +13,7 @@ typedef void(^boolReplyBlock)(BOOL);
 typedef void(^dictReplyBlock)(NSDictionary *);
 typedef void(^uintReplyBlock)(NSUInteger);
 
-#define CLASHFX_HELPER_PROTOCOL_VERSION 1
+#define CLASHFX_HELPER_PROTOCOL_VERSION 2
 
 @protocol ProxyConfigRemoteProcessProtocol <NSObject>
 @required

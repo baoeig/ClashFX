@@ -37,6 +37,7 @@ ProxyConfigRemoteProcessProtocol
 @implementation ProxyConfigHelper
 
 static const NSTimeInterval kMihomoGracefulStopTimeout = 2.0;
+static const unsigned long long kMihomoCoreLogMaximumBytes = 4 * 1024 * 1024;
 
 - (instancetype)init {
     
@@ -383,21 +384,41 @@ static const NSTimeInterval kMihomoGracefulStopTimeout = 2.0;
     task.standardOutput = pipe;
     task.standardError = pipe;
 
+    NSFileHandle *logHandle = [NSFileHandle fileHandleForWritingAtPath:logPath];
+    __block BOOL didReportTruncation = NO;
+
     pipe.fileHandleForReading.readabilityHandler = ^(NSFileHandle *handle) {
         NSData *data = [handle availableData];
-        if (data.length > 0) {
-            NSString *output = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-            NSLog(@"[mihomo_core] %@", output);
-            NSFileHandle *logHandle = [NSFileHandle fileHandleForWritingAtPath:logPath];
-            [logHandle seekToEndOfFile];
-            [logHandle writeData:data];
+        if (data.length == 0) {
+            handle.readabilityHandler = nil;
             [logHandle closeFile];
+            return;
+        }
+
+        unsigned long long offset = logHandle.offsetInFile;
+        if (offset < kMihomoCoreLogMaximumBytes) {
+            NSUInteger available = (NSUInteger)MIN(
+                (unsigned long long)data.length,
+                kMihomoCoreLogMaximumBytes - offset
+            );
+            if (available > 0) {
+                [logHandle writeData:[data subdataWithRange:NSMakeRange(0, available)]];
+            }
+        }
+
+        if (!didReportTruncation &&
+            offset + data.length > kMihomoCoreLogMaximumBytes) {
+            didReportTruncation = YES;
+            NSLog(@"[mihomo_core] Log capped at %llu bytes to prevent a core error loop from exhausting resources",
+                  kMihomoCoreLogMaximumBytes);
         }
     };
 
     NSError *error = nil;
     [task launchAndReturnError:&error];
     if (error) {
+        pipe.fileHandleForReading.readabilityHandler = nil;
+        [logHandle closeFile];
         reply([NSString stringWithFormat:@"Launch failed: %@", error.localizedDescription]);
         return;
     }

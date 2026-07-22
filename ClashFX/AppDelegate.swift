@@ -118,12 +118,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingEnhancedModeRefreshWork: DispatchWorkItem?
     private var pendingWakeRecoveryWork: DispatchWorkItem?
     private var isWakeEnhancedModeRestarting = false
+    private var enhancedModeHealthTimer: Timer?
+    private var isEnhancedModeHealthCheckInFlight = false
+    private var consecutiveEnhancedModeHealthFailures = 0
+    private var lastFatalTunRecoveryTime = Date.distantPast
+    private var didCompleteStaleEnhancedCoreCleanup = false
     private static let enhancedModeRestoreMaxAttempts = 12
     private static let enhancedModeRestoreRetryDelay: TimeInterval = 5
     private static let wakeRecoveryDelay: TimeInterval = 3
     private static let wakeRecoveryRetryDelay: TimeInterval = 2
     private static let wakeRecoveryMaxAttempts = 3
     private static let wakeEnhancedModeRestartMaxAttempts = 3
+    private static let enhancedModeHealthInterval: TimeInterval = 15
+    private static let enhancedModeHealthFailureThreshold = 2
+    private static let fatalTunRecoveryCooldown: TimeInterval = 30
     private static let runtimePatchedConfigPath = kConfigFolderPath + ".runtime_config.yaml"
 
     /// Short-circuits TerminalConfirmAction during self-relaunch so the old
@@ -240,7 +248,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             Logger.log("do not setup built in logger/traffic, useDirectApi = false")
         }
-        cleanupStaleMihomoCoreOnLaunch()
+        scheduleStaleMihomoCoreCleanupOnLaunch()
 
         // start proxy
         Logger.log("initClashCore")
@@ -275,6 +283,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: .trayMenuSettingsChanged,
             object: nil
         )
+        startEnhancedModeHealthMonitor()
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -288,6 +297,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ aNotification: Notification) {
         UserDefaults.standard.set(0, forKey: "launch_fail_times")
         Logger.log("ClashFX will terminate")
+        enhancedModeHealthTimer?.invalidate()
+        enhancedModeHealthTimer = nil
         // Fallback: TerminalCleanUpAction.run() already handles Enhanced Mode cleanup
         // in the normal quit path. This guard only fires if applicationWillTerminate
         // is reached without going through TerminalCleanUpAction (e.g. forced termination).
@@ -1136,6 +1147,102 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         pendingWakeRecoveryWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.wakeRecoveryDelay, execute: work)
+    }
+
+    private func startEnhancedModeHealthMonitor() {
+        enhancedModeHealthTimer?.invalidate()
+        let timer = Timer.scheduledTimer(
+            withTimeInterval: Self.enhancedModeHealthInterval,
+            repeats: true
+        ) { [weak self] _ in
+            self?.checkEnhancedModeRuntimeHealth()
+        }
+        timer.tolerance = 3
+        enhancedModeHealthTimer = timer
+    }
+
+    private func checkEnhancedModeRuntimeHealth() {
+        guard Settings.enhancedMode,
+              ConfigManager.shared.isEnhancedModeActive,
+              enhancedModeMenuItem.isEnabled,
+              !isWakeEnhancedModeRestarting else {
+            consecutiveEnhancedModeHealthFailures = 0
+            return
+        }
+        guard !isEnhancedModeHealthCheckInFlight else { return }
+
+        isEnhancedModeHealthCheckInFlight = true
+        checkCoreHealthAfterWake { [weak self] health in
+            guard let self = self else { return }
+            self.isEnhancedModeHealthCheckInFlight = false
+
+            guard Settings.enhancedMode,
+                  ConfigManager.shared.isEnhancedModeActive,
+                  self.enhancedModeMenuItem.isEnabled,
+                  !self.isWakeEnhancedModeRestarting else {
+                self.consecutiveEnhancedModeHealthFailures = 0
+                return
+            }
+
+            switch health {
+            case .healthy:
+                if self.consecutiveEnhancedModeHealthFailures > 0 {
+                    Logger.log("Enhanced Mode runtime health recovered")
+                }
+                self.consecutiveEnhancedModeHealthFailures = 0
+            case let .unhealthy(reason):
+                self.consecutiveEnhancedModeHealthFailures += 1
+                let failures = self.consecutiveEnhancedModeHealthFailures
+                guard failures >= Self.enhancedModeHealthFailureThreshold else {
+                    Logger.log(
+                        "Enhanced Mode runtime health failed: \(reason) " +
+                            "(\(failures)/\(Self.enhancedModeHealthFailureThreshold))",
+                        level: .warning
+                    )
+                    return
+                }
+
+                self.consecutiveEnhancedModeHealthFailures = 0
+                Logger.log(
+                    "Enhanced Mode runtime is unhealthy: \(reason); rebuilding core",
+                    level: .error
+                )
+                self.restartEnhancedModeAfterWake(
+                    attemptsLeft: Self.wakeEnhancedModeRestartMaxAttempts
+                )
+            }
+        }
+    }
+
+    private func recoverFromFatalTunReadFailure() {
+        let recover = { [weak self] in
+            guard let self = self else { return }
+            guard Settings.enhancedMode,
+                  ConfigManager.shared.isEnhancedModeActive,
+                  self.enhancedModeMenuItem.isEnabled,
+                  !self.isWakeEnhancedModeRestarting else {
+                return
+            }
+            let now = Date()
+            guard now.timeIntervalSince(self.lastFatalTunRecoveryTime) >=
+                Self.fatalTunRecoveryCooldown else { return }
+
+            self.lastFatalTunRecoveryTime = now
+            self.consecutiveEnhancedModeHealthFailures = 0
+            Logger.log(
+                "Detected a closed TUN socket read loop; rebuilding Enhanced Mode",
+                level: .error
+            )
+            self.restartEnhancedModeAfterWake(
+                attemptsLeft: Self.wakeEnhancedModeRestartMaxAttempts
+            )
+        }
+
+        if Thread.isMainThread {
+            recover()
+        } else {
+            DispatchQueue.main.async(execute: recover)
+        }
     }
 
     private func recoverProxyAfterWake(attemptsLeft: Int) {
@@ -2198,8 +2305,27 @@ extension AppDelegate {
         return []
     }
 
+    private func scheduleStaleMihomoCoreCleanupOnLaunch() {
+        guard Settings.enhancedMode else { return }
+        if PrivilegedHelperManager.shared.isHelperCheckFinished.value {
+            cleanupStaleMihomoCoreOnLaunch()
+            return
+        }
+
+        PrivilegedHelperManager.shared.isHelperCheckFinished
+            .filter { $0 }
+            .take(1)
+            .observe(on: MainScheduler.instance)
+            .subscribe(onNext: { [weak self] _ in
+                self?.cleanupStaleMihomoCoreOnLaunch()
+            })
+            .disposed(by: disposeBag)
+    }
+
     private func cleanupStaleMihomoCoreOnLaunch() {
         guard Settings.enhancedMode else { return }
+        guard !didCompleteStaleEnhancedCoreCleanup else { return }
+        didCompleteStaleEnhancedCoreCleanup = true
         Logger.log("Cleanup stale mihomo_core from previous session", level: .info)
         guard let binaryPath = Bundle.main.path(forResource: "mihomo_core", ofType: nil) else { return }
         let semaphore = DispatchSemaphore(value: 0)
@@ -2248,6 +2374,11 @@ extension AppDelegate {
         }
 
         guard PrivilegedHelperManager.shared.isHelperCheckFinished.value else {
+            retryOrFail(NSLocalizedString("Helper not available", comment: ""))
+            return
+        }
+
+        guard didCompleteStaleEnhancedCoreCleanup else {
             retryOrFail(NSLocalizedString("Helper not available", comment: ""))
             return
         }
@@ -2535,7 +2666,10 @@ extension AppDelegate: ApiRequestStreamDelegate {
     }
 
     func didGetLog(log: String, level: String) {
-        Logger.log(log, level: ClashLogLevel(rawValue: level) ?? .unknow)
+        let clashLevel = ClashLogLevel(rawValue: level) ?? .unknow
+        if Logger.logCore(log, level: clashLevel) {
+            recoverFromFatalTunReadFailure()
+        }
     }
 }
 
