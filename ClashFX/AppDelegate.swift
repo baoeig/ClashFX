@@ -131,11 +131,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingStreamResetWork: DispatchWorkItem?
     private var pendingEnhancedModeRefreshWork: DispatchWorkItem?
     private var pendingWakeRecoveryWork: DispatchWorkItem?
+    private var pendingProxyBypassReloadWork: DispatchWorkItem?
     private var isWakeEnhancedModeRestarting = false
     private var enhancedModeHealthTimer: Timer?
     private var isEnhancedModeHealthCheckInFlight = false
     private var consecutiveEnhancedModeHealthFailures = 0
-    private var lastFatalTunRecoveryTime = Date.distantPast
+    private var lastCoreLogRecoveryTime = Date.distantPast
     private var didCompleteStaleEnhancedCoreCleanup = false
     private var outboundModeRequestSequence = 0
     private var latestOutboundModeRequestID = 0
@@ -1016,6 +1017,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         requestConfigUpdateApplyingRuntimePatch(configName: config, callback: reloadCallback)
     }
 
+    func applyProxyBypassSettings() {
+        if ConfigManager.shared.proxyPortAutoSet {
+            SystemProxyManager.shared.enableProxy()
+        }
+
+        guard !Settings.enhancedMode, ConfigManager.shared.isRunning else {
+            return
+        }
+        scheduleProxyBypassConfigReload()
+    }
+
+    private func scheduleProxyBypassConfigReload(after delay: TimeInterval = 0.15) {
+        pendingProxyBypassReloadWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            self.pendingProxyBypassReloadWork = nil
+            guard !Settings.enhancedMode, ConfigManager.shared.isRunning else {
+                return
+            }
+            guard !self.isConfigUpdating else {
+                self.scheduleProxyBypassConfigReload(after: 0.3)
+                return
+            }
+            self.updateConfig(showNotification: false) { error in
+                if let error {
+                    Logger.log(
+                        "Failed to apply updated System Proxy bypass rules: \(error)",
+                        level: .warning
+                    )
+                } else {
+                    Logger.log("Applied updated System Proxy bypass rules")
+                }
+            }
+        }
+        pendingProxyBypassReloadWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
     private func requestConfigUpdateApplyingRuntimePatch(configName: String, callback: @escaping ((ErrorString?) -> Void)) {
         ConfigManager.getConfigPath(configName: configName) { [weak self] sourcePath in
             guard let self = self else { return }
@@ -1303,7 +1342,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func recoverFromFatalTunReadFailure() {
+    private func recoverFromCoreLogFailure(_ reason: CoreLogRecoveryReason) {
         let recover = { [weak self] in
             guard let self = self else { return }
             guard Settings.enhancedMode,
@@ -1313,15 +1352,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             let now = Date()
-            guard now.timeIntervalSince(self.lastFatalTunRecoveryTime) >=
+            guard now.timeIntervalSince(self.lastCoreLogRecoveryTime) >=
                 Self.fatalTunRecoveryCooldown else { return }
 
-            self.lastFatalTunRecoveryTime = now
+            self.lastCoreLogRecoveryTime = now
             self.consecutiveEnhancedModeHealthFailures = 0
-            Logger.log(
-                "Detected a closed TUN socket read loop; rebuilding Enhanced Mode",
-                level: .error
-            )
+            let message: String
+            switch reason {
+            case .closedTunSocket:
+                message = "Detected a closed TUN socket read loop; rebuilding Enhanced Mode"
+            case .outboundInterfaceUnavailable:
+                message = "Detected a TUN outbound-interface error storm; rebuilding Enhanced Mode"
+            }
+            Logger.log(message, level: .error)
             self.restartEnhancedModeAfterWake(
                 attemptsLeft: Self.wakeEnhancedModeRestartMaxAttempts
             )
@@ -2871,8 +2914,8 @@ extension AppDelegate: ApiRequestStreamDelegate {
 
     func didGetLog(log: String, level: String) {
         let clashLevel = ClashLogLevel(rawValue: level) ?? .unknow
-        if Logger.logCore(log, level: clashLevel) {
-            recoverFromFatalTunReadFailure()
+        if let recoveryReason = Logger.logCore(log, level: clashLevel) {
+            recoverFromCoreLogFailure(recoveryReason)
         }
     }
 }

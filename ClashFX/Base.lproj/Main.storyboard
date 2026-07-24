@@ -399,7 +399,7 @@
                                             <subviews>
                                                 <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="TVZ-xJ-zK0">
                                                     <rect key="frame" x="18" y="340" width="394" height="16"/>
-                                                    <textFieldCell key="cell" lineBreakMode="clipping" title="Bypass proxy settings for these Hosts &amp; Domains" id="NPu-V9-f3r">
+                                                    <textFieldCell key="cell" lineBreakMode="clipping" title="System Proxy bypass for these Hosts &amp; Domains" id="NPu-V9-f3r">
                                                         <font key="font" usesAppearanceFont="YES"/>
                                                         <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                                                         <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -407,7 +407,7 @@
                                                 </textField>
                                                 <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="VvP-5I-QhW">
                                                     <rect key="frame" x="18" y="323" width="394" height="13"/>
-                                                    <textFieldCell key="cell" lineBreakMode="clipping" title="Separated by commas(,)" id="sfe-wu-UXp">
+                                                    <textFieldCell key="cell" lineBreakMode="clipping" title="Applies now; Enhanced Mode uses Profile Mixin" id="sfe-wu-UXp">
                                                         <font key="font" textStyle="footnote" name=".SFNS-Regular"/>
                                                         <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
                                                         <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>

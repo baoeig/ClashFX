@@ -1,21 +1,31 @@
 ### Bug Fixes
 
+- **System Proxy Bypass Changes Apply Immediately** — Editing the bypass list now reapplies the active macOS System Proxy settings and reloads the standard-mode runtime rules without requiring a proxy toggle or app restart. The settings copy also clarifies that Enhanced Mode bypasses belong in Profile Mixin. (#182)
+- **TUN Interface Error Storms Recover Automatically** — Repeated interface auto-detection failures are grouped and rate-limited before file logging, and a sustained error storm now triggers an Enhanced Mode rebuild instead of consuming CPU and growing logs indefinitely. (#183)
+- **Dashboard Version Indicators No Longer Suggest Unsupported Updates** — ClashFX now removes the upstream update dots, disables the bundled Dashboard's version actions, and explains that Dashboard and core updates are managed by ClashFX releases. (#184)
 - **Outbound Mode No Longer Changes Unexpectedly** — Removed the default global `⌥D`, `⌥R`, and `⌥G` bindings that could switch ClashFX from other apps. Upgrades clear only bindings that still match those legacy defaults, while preserving other custom shortcuts. (#179)
 - **The Last Mode Choice Now Wins Reliably** — Outbound-mode changes are serialized, persisted only after the core accepts them, and verified against the core's actual mode. Config reloads and stale state reads can no longer overwrite the user's latest choice, and logs now record each change source and result. (#179)
 
 ### Contributors
 
+- @hackerslizc — Reported that System Proxy bypass changes did not take effect for Codex-related traffic. (#182)
+- @mumaxiaozi — Reported the high-energy TUN log storm and the misleading Dashboard/core update indicators. (#183, #184)
 - @Ha-cyber — Reported and diagnosed the intermittent switch from Rule mode to Direct mode. (#179)
 
 ---
 
 ### 修复
 
+- **系统代理绕过规则会立即生效** — 编辑绕过列表后会立刻重新应用当前 macOS 系统代理设置，并在标准模式下重载运行时规则，无需切换代理或重启应用；设置文案也明确提示增强模式应使用 Profile Mixin 配置绕过。 (#182)
+- **TUN 接口错误刷屏会自动恢复** — 接口自动检测失败会在写入文件前按类别限流；持续刷屏时会自动重建增强模式，避免 CPU 占用升高及日志无限增长。 (#183)
+- **控制台版本提示不再误导用户升级** — ClashFX 会移除上游控制台的更新圆点、禁用内置控制台中的版本操作，并明确说明控制台与核心由 ClashFX 版本统一管理。 (#184)
 - **出站模式不再意外切换** — 移除可能在其他应用中误触并切换 ClashFX 的默认全局快捷键 `⌥D`、`⌥R` 和 `⌥G`；升级时只清除仍与旧默认值相同的绑定，其他自定义快捷键保持不变。 (#179)
 - **最后一次模式选择会可靠生效** — 出站模式切换现在会串行执行，仅在核心确认成功后保存，并再次核对核心实际模式；配置重载及过期状态读取不再覆盖用户最后一次选择，日志也会记录每次切换的来源与结果。 (#179)
 
 ### 贡献者
 
+- @hackerslizc — 反馈 Codex 相关流量的系统代理绕过规则修改后未生效的问题。 (#182)
+- @mumaxiaozi — 反馈 TUN 日志刷屏导致高能耗，以及控制台/核心更新提示容易误解的问题。 (#183, #184)
 - @Ha-cyber — 反馈并协助定位规则模式偶发切换为直接连接的问题。 (#179)
 
 <!-- Previous release notes -->

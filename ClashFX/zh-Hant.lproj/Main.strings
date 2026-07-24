@@ -178,8 +178,8 @@
 /* Class = "NSBox"; title = "Debug Setting"; ObjectID = "NLT-FZ-48V"; */
 "NLT-FZ-48V.title" = "調試設定";
 
-/* Class = "NSTextFieldCell"; title = "Bypass proxy settings for these Hosts & Domains"; ObjectID = "NPu-V9-f3r"; */
-"NPu-V9-f3r.title" = "繞過這些主機和域的代理設定";
+/* Class = "NSTextFieldCell"; title = "System Proxy bypass for these Hosts & Domains"; ObjectID = "NPu-V9-f3r"; */
+"NPu-V9-f3r.title" = "系統代理：繞過這些主機與網域";
 
 /* Class = "NSTextFieldCell"; title = "This allows you to control the clash core running in the different machine"; ObjectID = "WkL-aX-66E"; */
 "WkL-aX-66E.title" = "這允許你控制在不同機器上運行的衝突核心";
@@ -235,8 +235,8 @@
 /* Class = "NSViewController"; title = "External Manager"; ObjectID = "s6y-wL-pnr"; */
 "s6y-wL-pnr.title" = "外部管理";
 
-/* Class = "NSTextFieldCell"; title = "Separated by commas(,)"; ObjectID = "sfe-wu-UXp"; */
-"sfe-wu-UXp.title" = "以逗號(,)分隔";
+/* Class = "NSTextFieldCell"; title = "Applies now; Enhanced Mode uses Profile Mixin"; ObjectID = "sfe-wu-UXp"; */
+"sfe-wu-UXp.title" = "立即生效；增強模式請使用 Profile Mixin";
 
 /* Class = "NSTextFieldCell"; title = "Proxy Port:"; ObjectID = "uUA-LS-Hu8"; */
 "uUA-LS-Hu8.title" = "代理端口";

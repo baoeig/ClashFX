@@ -187,8 +187,8 @@
 /* Class = "NSTabViewItem"; label = "General"; ObjectID = "Ltt-Vq-Hh1"; */
 "Ltt-Vq-Hh1.label" = "Общие";
 
-/* Class = "NSTextFieldCell"; title = "Bypass proxy settings for these Hosts & Domains"; ObjectID = "NPu-V9-f3r"; */
-"NPu-V9-f3r.title" = "Обходить настройки прокси для этих хостов и доменов";
+/* Class = "NSTextFieldCell"; title = "System Proxy bypass for these Hosts & Domains"; ObjectID = "NPu-V9-f3r"; */
+"NPu-V9-f3r.title" = "Системный прокси: обход для этих хостов и доменов";
 
 /* Class = "NSButtonCell"; title = "Launch at login"; ObjectID = "dV6-4Z-2SO"; */
 "dV6-4Z-2SO.title" = "Запуск при входе";
@@ -205,8 +205,8 @@
 /* Class = "NSButtonCell"; title = "Reduce notifications"; ObjectID = "jsL-HC-6ne"; */
 "jsL-HC-6ne.title" = "Меньше уведомлений";
 
-/* Class = "NSTextFieldCell"; title = "Separated by commas(,)"; ObjectID = "sfe-wu-UXp"; */
-"sfe-wu-UXp.title" = "Разделяйте запятыми(,)";
+/* Class = "NSTextFieldCell"; title = "Applies now; Enhanced Mode uses Profile Mixin"; ObjectID = "sfe-wu-UXp"; */
+"sfe-wu-UXp.title" = "Сразу применяется; расширенный режим использует Profile Mixin";
 
 /* Class = "NSButtonCell"; title = "Allow control from lan"; ObjectID = "E8B-e5-K0A"; */
 "E8B-e5-K0A.title" = "Разрешить управление из локальной сети (не рекомендуется)";

@@ -78,29 +78,91 @@ class ClashWebViewContoller: NSViewController {
     })();
     """
 
-    private static let hideUpgradeJS: String = """
-    (function() {
-      var HIDE_LABELS = ['GEO Databases', 'Dashboard UI', 'Restart', 'Upgrade'];
-      function hideItems(root) {
-        var labels = root.querySelectorAll('div');
-        for (var i = 0; i < labels.length; i++) {
-          var el = labels[i];
-          if (el.children.length > 0) continue;
-          var txt = el.textContent.trim();
-          for (var j = 0; j < HIDE_LABELS.length; j++) {
-            if (txt.indexOf(HIDE_LABELS[j]) !== -1) {
-              var row = el.parentElement;
-              if (row) row.style.display = 'none';
-              break;
+    private static func dashboardUpgradePolicyJS(managedMessage: String) -> String {
+        let escapedManagedMessage = managedMessage
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+        return """
+        (function() {
+          var MANAGED_MESSAGE = '\(escapedManagedMessage)';
+          var VERSION_PATTERN = /^v?\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$/;
+          var HIDE_LABELS = ['GEO Databases', 'Dashboard UI', 'Restart', 'Upgrade'];
+          function hideItems(root) {
+            var labels = root.querySelectorAll('div');
+            for (var i = 0; i < labels.length; i++) {
+              var el = labels[i];
+              if (el.children.length > 0) continue;
+              var txt = el.textContent.trim();
+              for (var j = 0; j < HIDE_LABELS.length; j++) {
+                if (txt.indexOf(HIDE_LABELS[j]) !== -1) {
+                  var row = el.parentElement;
+                  if (row) row.style.display = 'none';
+                  break;
+                }
+              }
             }
           }
-        }
-      }
-      var mo = new MutationObserver(function() { hideItems(document); });
-      mo.observe(document.documentElement, {childList: true, subtree: true});
-      document.addEventListener('DOMContentLoaded', function() { hideItems(document); });
-    })();
-    """
+          function removeUpdateIndicator(button) {
+            var candidates = button.querySelectorAll('span');
+            for (var i = candidates.length - 1; i >= 0; i--) {
+              var candidate = candidates[i];
+              if (candidate.querySelector('.animate-ping')) {
+                candidate.remove();
+              }
+            }
+          }
+          function manageVersionButtons(root) {
+            var buttons = root.querySelectorAll('button');
+            var containers = [];
+            for (var i = 0; i < buttons.length; i++) {
+              var button = buttons[i];
+              var text = button.textContent.trim();
+              var collapsedTitle = button.getAttribute('title') || '';
+              var isExpandedVersion = VERSION_PATTERN.test(text);
+              var isCollapsedVersions = /^UI\\s+v?\\d+\\.\\d+\\.\\d+.*Core\\s+v?\\d+\\.\\d+\\.\\d+/.test(collapsedTitle);
+              if (!isExpandedVersion && !isCollapsedVersions) continue;
+              removeUpdateIndicator(button);
+              button.dataset.clashfxManagedVersion = 'true';
+              button.style.cursor = 'default';
+              button.style.pointerEvents = 'none';
+              var versionText = isCollapsedVersions ? collapsedTitle.split(' — ')[0] : text;
+              button.setAttribute('title', versionText + ' — ' + MANAGED_MESSAGE);
+              button.setAttribute('aria-label', versionText + ' — ' + MANAGED_MESSAGE);
+              if (isExpandedVersion && button.parentElement &&
+                  containers.indexOf(button.parentElement) === -1) {
+                containers.push(button.parentElement);
+              }
+            }
+            for (var j = 0; j < containers.length; j++) {
+              var container = containers[j];
+              var versionButtons = container.querySelectorAll('button[data-clashfx-managed-version="true"]');
+              if (versionButtons.length < 2 ||
+                  container.querySelector('[data-clashfx-managed-note="true"]')) {
+                continue;
+              }
+              var note = document.createElement('div');
+              note.dataset.clashfxManagedNote = 'true';
+              note.textContent = MANAGED_MESSAGE;
+              note.style.fontSize = '11px';
+              note.style.lineHeight = '1.25';
+              note.style.textAlign = 'center';
+              note.style.opacity = '0.6';
+              note.style.padding = '2px 4px 0';
+              container.appendChild(note);
+            }
+          }
+          function applyPolicy() {
+            hideItems(document);
+            manageVersionButtons(document);
+          }
+          var mo = new MutationObserver(applyPolicy);
+          mo.observe(document.documentElement, {childList: true, subtree: true});
+          document.addEventListener('DOMContentLoaded', applyPolicy);
+          applyPolicy();
+        })();
+        """
+    }
 
     private static func metaCubeXDConfigJS(port: String, secret: String) -> String {
         let backendURL = "http://127.0.0.1:\(port)"
@@ -144,7 +206,15 @@ class ClashWebViewContoller: NSViewController {
         let secret = ConfigManager.shared.overrideSecret ?? ConfigManager.shared.apiSecret
         let metaCubeXDConfigScript = WKUserScript(source: Self.metaCubeXDConfigJS(port: port, secret: secret), injectionTime: .atDocumentStart, forMainFrameOnly: true)
         let guardScript = WKUserScript(source: Self.apiGuardJS, injectionTime: .atDocumentStart, forMainFrameOnly: true)
-        let hideScript = WKUserScript(source: Self.hideUpgradeJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        let managedMessage = NSLocalizedString(
+            "Dashboard and core updates are managed by ClashFX",
+            comment: ""
+        )
+        let hideScript = WKUserScript(
+            source: Self.dashboardUpgradePolicyJS(managedMessage: managedMessage),
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
         webview.configuration.userContentController.addUserScript(metaCubeXDConfigScript)
         webview.configuration.userContentController.addUserScript(guardScript)
         webview.configuration.userContentController.addUserScript(hideScript)

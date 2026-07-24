@@ -187,8 +187,8 @@
 /* Class = "NSTabViewItem"; label = "General"; ObjectID = "Ltt-Vq-Hh1"; */
 "Ltt-Vq-Hh1.label" = "全般";
 
-/* Class = "NSTextFieldCell"; title = "Bypass proxy settings for these Hosts & Domains"; ObjectID = "NPu-V9-f3r"; */
-"NPu-V9-f3r.title" = "これらのホストとドメインのプロキシ設定をバイパス";
+/* Class = "NSTextFieldCell"; title = "System Proxy bypass for these Hosts & Domains"; ObjectID = "NPu-V9-f3r"; */
+"NPu-V9-f3r.title" = "システムプロキシ：これらのホストとドメインをバイパス";
 
 /* Class = "NSButtonCell"; title = "Launch at login"; ObjectID = "dV6-4Z-2SO"; */
 "dV6-4Z-2SO.title" = "ログイン時に起動";
@@ -205,8 +205,8 @@
 /* Class = "NSButtonCell"; title = "Reduce notifications"; ObjectID = "jsL-HC-6ne"; */
 "jsL-HC-6ne.title" = "通知を減らす";
 
-/* Class = "NSTextFieldCell"; title = "Separated by commas(,)"; ObjectID = "sfe-wu-UXp"; */
-"sfe-wu-UXp.title" = "カンマ (,) で区切る";
+/* Class = "NSTextFieldCell"; title = "Applies now; Enhanced Mode uses Profile Mixin"; ObjectID = "sfe-wu-UXp"; */
+"sfe-wu-UXp.title" = "即時適用。拡張モードでは Profile Mixin を使用";
 
 /* Class = "NSButtonCell"; title = "Allow control from lan"; ObjectID = "E8B-e5-K0A"; */
 "E8B-e5-K0A.title" = "LAN からの制御を許可 (非推奨)";

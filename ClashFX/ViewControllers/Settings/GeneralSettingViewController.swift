@@ -42,10 +42,18 @@ class GeneralSettingViewController: NSViewController {
             ? tunRouteExcludes.joined(separator: ",\n")
             : Settings.tunRouteExcludeRawText
         ignoreListTextView.rx
-            .string.debounce(.milliseconds(500), scheduler: MainScheduler.instance)
-            .map { $0.components(separatedBy: ",").filter { !$0.isEmpty } }
+            .string
+            .skip(1)
+            .debounce(.milliseconds(500), scheduler: MainScheduler.instance)
+            .map {
+                $0.components(separatedBy: CharacterSet(charactersIn: ",\n\r"))
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            }
+            .distinctUntilChanged()
             .subscribe { arr in
                 Settings.proxyIgnoreList = arr
+                AppDelegate.shared.applyProxyBypassSettings()
             }.disposed(by: disposeBag)
 
         tunRouteExcludeTextView.rx
@@ -208,9 +216,10 @@ class GeneralSettingViewController: NSViewController {
         SSIDSuspendTool.shared.update()
     }
 
-    @IBAction func actionResetIgnoreList(_ sender: Any) {
+    @IBAction func actionResetIgnoreList(_: Any) {
         ignoreListTextView.string = Settings.proxyIgnoreListDefaultValue.joined(separator: ",")
         Settings.proxyIgnoreList = Settings.proxyIgnoreListDefaultValue
+        AppDelegate.shared.applyProxyBypassSettings()
     }
 
     @IBAction func actionResetTunRouteExcludeList(_ sender: Any) {

@@ -438,6 +438,7 @@
 
 /* No comment provided by engineer. */
 "Dashboard" = "Панель управления";
+"Dashboard and core updates are managed by ClashFX" = "Обновления панели и ядра управляются ClashFX";
 
 /* No comment provided by engineer. */
 "Connection Details" = "Сведения о соединении";

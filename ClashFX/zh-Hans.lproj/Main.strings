@@ -187,8 +187,8 @@
 /* Class = "NSTabViewItem"; label = "General"; ObjectID = "Ltt-Vq-Hh1"; */
 "Ltt-Vq-Hh1.label" = "通用";
 
-/* Class = "NSTextFieldCell"; title = "Bypass proxy settings for these Hosts & Domains"; ObjectID = "NPu-V9-f3r"; */
-"NPu-V9-f3r.title" = "忽略这些主机与域的代理设置";
+/* Class = "NSTextFieldCell"; title = "System Proxy bypass for these Hosts & Domains"; ObjectID = "NPu-V9-f3r"; */
+"NPu-V9-f3r.title" = "系统代理：绕过这些主机与域名";
 
 /* Class = "NSButtonCell"; title = "Launch at login"; ObjectID = "dV6-4Z-2SO"; */
 "dV6-4Z-2SO.title" = "开机启动";
@@ -205,8 +205,8 @@
 /* Class = "NSButtonCell"; title = "Reduce notifications"; ObjectID = "jsL-HC-6ne"; */
 "jsL-HC-6ne.title" = "减少通知";
 
-/* Class = "NSTextFieldCell"; title = "Separated by commas(,)"; ObjectID = "sfe-wu-UXp"; */
-"sfe-wu-UXp.title" = "使用英文逗号(,)分隔";
+/* Class = "NSTextFieldCell"; title = "Applies now; Enhanced Mode uses Profile Mixin"; ObjectID = "sfe-wu-UXp"; */
+"sfe-wu-UXp.title" = "立即生效；增强模式请使用 Profile Mixin";
 
 /* Class = "NSButtonCell"; title = "Allow control from lan"; ObjectID = "E8B-e5-K0A"; */
 "E8B-e5-K0A.title" = "允许局域网控制(不推荐)";
