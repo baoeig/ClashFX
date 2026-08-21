@@ -114,6 +114,82 @@ final class BenchmarkURLSettingsTests: XCTestCase {
     }
 }
 
+final class ManagedOperationSettlementTests: XCTestCase {
+    func testNormalResultFiresOnce() {
+        var outcomes = [String]()
+        let settlement = ManagedOperationSettlement<String> { outcomes.append($0) }
+
+        XCTAssertTrue(settlement.finish("success"))
+        XCTAssertFalse(settlement.finish("failure"))
+        XCTAssertEqual(outcomes, ["success"])
+    }
+
+    func testImmediateFailureFiresOnce() {
+        var outcomes = [String]()
+        let settlement = ManagedOperationSettlement<String> { outcomes.append($0) }
+
+        XCTAssertTrue(settlement.finish("failure"))
+        XCTAssertFalse(settlement.finish("success"))
+        XCTAssertEqual(outcomes, ["failure"])
+    }
+
+    func testTimeoutWinsOverLateSuccess() {
+        var outcomes = [String]()
+        let settlement = ManagedOperationSettlement<String> { outcomes.append($0) }
+
+        XCTAssertTrue(settlement.finish("timeout"))
+        XCTAssertFalse(settlement.finish("success"))
+        XCTAssertEqual(outcomes, ["timeout"])
+    }
+
+    func testSuccessWinsOverLaterTimeout() {
+        var outcomes = [String]()
+        let settlement = ManagedOperationSettlement<String> { outcomes.append($0) }
+
+        XCTAssertTrue(settlement.finish("success"))
+        XCTAssertFalse(settlement.finish("timeout"))
+        XCTAssertEqual(outcomes, ["success"])
+    }
+}
+
+final class TerminationCleanupPolicyTests: XCTestCase {
+    func testNoCleanupDoesNotWait() {
+        let policy = TerminationCleanupPolicy.make(observation: TerminationCleanupObservation(
+            enhancedModeActive: false, proxyPortAutoSet: false, isProxySetByOther: false,
+            currentSystemSetToClash: false, hasInterfaceProxySetToClash: false
+        ))
+        XCTAssertFalse(policy.shouldWait)
+    }
+
+    func testEnhancedAndProxyCleanupCombineIntoOneWait() {
+        let policy = TerminationCleanupPolicy.make(observation: TerminationCleanupObservation(
+            enhancedModeActive: true, proxyPortAutoSet: true, isProxySetByOther: false,
+            currentSystemSetToClash: false, hasInterfaceProxySetToClash: false
+        ))
+        XCTAssertTrue(policy.cleanEnhancedMode)
+        XCTAssertTrue(policy.cleanSystemProxy)
+        XCTAssertTrue(policy.shouldWait)
+    }
+
+    func testOwnedProxyStateSelectsRestore() {
+        let policy = TerminationCleanupPolicy.make(observation: TerminationCleanupObservation(
+            enhancedModeActive: false, proxyPortAutoSet: true, isProxySetByOther: false,
+            currentSystemSetToClash: false, hasInterfaceProxySetToClash: false
+        ))
+        XCTAssertTrue(policy.cleanSystemProxy)
+        XCTAssertFalse(policy.forceDisableProxy)
+    }
+
+    func testExternallyOwnedProxyStateSelectsForceDisable() {
+        let policy = TerminationCleanupPolicy.make(observation: TerminationCleanupObservation(
+            enhancedModeActive: false, proxyPortAutoSet: false, isProxySetByOther: true,
+            currentSystemSetToClash: true, hasInterfaceProxySetToClash: false
+        ))
+        XCTAssertTrue(policy.cleanSystemProxy)
+        XCTAssertTrue(policy.forceDisableProxy)
+    }
+}
+
 final class BenchmarkRegressionTests: XCTestCase {
     private func snapshot(_ proxyJSON: [[String: Any]]) -> ClashProxyResp {
         let proxies = Dictionary(uniqueKeysWithValues: proxyJSON.compactMap { proxy -> (String, Any)? in

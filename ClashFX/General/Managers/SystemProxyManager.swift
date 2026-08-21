@@ -21,10 +21,6 @@ class SystemProxyManager: NSObject {
         }
     }
 
-    private var helper: ProxyConfigRemoteProcessProtocol? {
-        PrivilegedHelperManager.shared.helper()
-    }
-
     func saveProxy() {
         guard !Settings.disableRestoreProxy else { return }
         Logger.log("saveProxy", level: .debug)
@@ -72,22 +68,35 @@ class SystemProxyManager: NSObject {
 
     func disableProxy(port: Int, socksPort: Int, forceDisable: Bool = false, complete: (() -> Void)? = nil) {
         Logger.log("disableProxy", level: .debug)
-
-        if Settings.disableRestoreProxy || forceDisable {
-            helper?.disableProxy(withFilterInterface: Settings.filterInterface) { error in
-                if let error = error {
-                    Logger.log("disableProxy \(error)", level: .error)
-                }
+        let settlement = ManagedOperationSettlement<Void> { _ in
+            DispatchQueue.main.async {
                 complete?()
             }
+        }
+        settlement.scheduleTimeout(after: 8, queue: .global(qos: .utility), outcome: {
+            Logger.log("disableProxy timed out", level: .error)
+            return ()
+        })
+
+        let finish: (String?) -> Void = { error in
+            if let error = error {
+                Logger.log("disableProxy \(error)", level: .error)
+            }
+            _ = settlement.finish(())
+        }
+
+        guard let proxy = PrivilegedHelperManager.shared.helper(failture: {
+            finish("Helper connection failed")
+        }) else {
+            finish("Helper unavailable")
             return
         }
 
-        helper?.restoreProxy(withCurrentPort: Int32(port), socksPort: Int32(socksPort), info: savedProxyInfo, filterInterface: Settings.filterInterface, error: { error in
-            if let error = error {
-                Logger.log("restoreProxy \(error)", level: .error)
-            }
-            complete?()
-        })
+        if Settings.disableRestoreProxy || forceDisable {
+            proxy.disableProxy(withFilterInterface: Settings.filterInterface, reply: finish)
+            return
+        }
+
+        proxy.restoreProxy(withCurrentPort: Int32(port), socksPort: Int32(socksPort), info: savedProxyInfo, filterInterface: Settings.filterInterface, error: finish)
     }
 }

@@ -15,66 +15,68 @@ enum TerminalConfirmAction {
         guard confirmAction() else {
             return .terminateCancel
         }
+        let policy = TerminationCleanupPolicy.make(observation: TerminationCleanupObservation(
+            enhancedModeActive: ConfigManager.shared.isEnhancedModeActive,
+            proxyPortAutoSet: ConfigManager.shared.proxyPortAutoSet,
+            isProxySetByOther: ConfigManager.shared.isProxySetByOtherVariable.value,
+            currentSystemSetToClash: NetworkChangeNotifier.isCurrentSystemSetToClash(looser: true),
+            hasInterfaceProxySetToClash: NetworkChangeNotifier.hasInterfaceProxySetToClash()
+        ))
         let group = DispatchGroup()
-        var shouldWait = false
 
-        if ConfigManager.shared.isEnhancedModeActive {
+        if policy.cleanEnhancedMode {
             Logger.log("ClashFX quit need clean Enhanced Mode")
-            shouldWait = true
             group.enter()
             AppDelegate.shared.cleanupEnhancedModeForTermination {
                 group.leave()
             }
         }
 
-        if ConfigManager.shared.proxyPortAutoSet && !ConfigManager.shared.isProxySetByOtherVariable.value || NetworkChangeNotifier.isCurrentSystemSetToClash(looser: true) ||
-            NetworkChangeNotifier.hasInterfaceProxySetToClash() {
+        if policy.cleanSystemProxy {
             Logger.log("ClashFX quit need clean proxy setting")
-            shouldWait = true
             group.enter()
 
-            SystemProxyManager.shared.disableProxy(forceDisable: ConfigManager.shared.isProxySetByOtherVariable.value) {
+            SystemProxyManager.shared.disableProxy(forceDisable: policy.forceDisableProxy) {
                 group.leave()
             }
         }
 
-        if !shouldWait {
+        if !policy.shouldWait {
             Logger.log("ClashFX quit without clean waiting")
             return .terminateNow
         }
 
-        if let statusItem = AppDelegate.shared.statusItem, statusItem.menu != nil {
-            let quittingMenu = NSMenu()
-            let quittingItem = NSMenuItem(
-                title: NSLocalizedString("Quitting…", comment: ""),
-                action: nil,
-                keyEquivalent: ""
-            )
-            quittingItem.isEnabled = false
-            quittingMenu.addItem(quittingItem)
-            statusItem.menu = quittingMenu
+        DispatchQueue.main.async {
+            if let statusItem = AppDelegate.shared.statusItem, statusItem.menu != nil {
+                let quittingMenu = NSMenu()
+                let quittingItem = NSMenuItem(
+                    title: NSLocalizedString("Quitting…", comment: ""),
+                    action: nil,
+                    keyEquivalent: ""
+                )
+                quittingItem.isEnabled = false
+                quittingMenu.addItem(quittingItem)
+                statusItem.menu = quittingMenu
+            }
+            AppDelegate.shared.disposeBag = DisposeBag()
         }
-        AppDelegate.shared.disposeBag = DisposeBag()
+
+        let terminationSettlement = ManagedOperationSettlement<Void> { _ in
+            DispatchQueue.main.async {
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        terminationSettlement.scheduleTimeout(after: 10, queue: .global(qos: .default), outcome: { () })
 
         DispatchQueue.global(qos: .default).async {
-            let res = group.wait(timeout: .now() + 10)
+            let res = group.wait(timeout: .now() + 9.8)
             switch res {
             case .success:
                 Logger.log("ClashFX quit after clean up finish")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    NSApp.reply(toApplicationShouldTerminate: true)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    NSApp.reply(toApplicationShouldTerminate: true)
-                }
+                _ = terminationSettlement.finish(())
             case .timedOut:
                 Logger.log("ClashFX quit after clean up timeout")
-                DispatchQueue.main.async {
-                    NSApp.reply(toApplicationShouldTerminate: true)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    NSApp.reply(toApplicationShouldTerminate: true)
-                }
+                _ = terminationSettlement.finish(())
             }
         }
 
