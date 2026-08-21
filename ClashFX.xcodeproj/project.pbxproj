@@ -23,6 +23,9 @@
 		C30600000000000000000003 /* ManagedOperationSettlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30600000000000000000001 /* ManagedOperationSettlement.swift */; };
 		C30700000000000000000002 /* SystemProxyOperationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30700000000000000000001 /* SystemProxyOperationPolicy.swift */; };
 		C30700000000000000000003 /* SystemProxyOperationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30700000000000000000001 /* SystemProxyOperationPolicy.swift */; };
+		C30800000000000000000002 /* ProxySettingRestorationPolicyTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C30800000000000000000001 /* ProxySettingRestorationPolicyTests.m */; };
+		C30800000000000000000004 /* ProxySettingRestorationPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = C30800000000000000000003 /* ProxySettingRestorationPolicy.m */; };
+		C30800000000000000000005 /* ProxySettingRestorationPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = C30800000000000000000003 /* ProxySettingRestorationPolicy.m */; };
 		03B729DE29C62F46117B82A2 /* LabSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6174820C53D16D319C2DB8E /* LabSupport.swift */; };
 		079C0498F443DE06CFD1A2E0 /* FormHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1541315BE9AC1A5200C8FDA /* FormHelpers.swift */; };
 		0AD7506B2A5B9A04001FFBBD /* ConnectionLeftPannelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD7506A2A5B9A04001FFBBD /* ConnectionLeftPannelViewModel.swift */; };
@@ -213,6 +216,9 @@
 		C30500000000000000000001 /* ShortcutScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutScope.swift; sourceTree = "<group>"; };
 		C30600000000000000000001 /* ManagedOperationSettlement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Utils/ManagedOperationSettlement.swift; sourceTree = "<group>"; };
 		C30700000000000000000001 /* SystemProxyOperationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Utils/SystemProxyOperationPolicy.swift; sourceTree = "<group>"; };
+		C30800000000000000000001 /* ProxySettingRestorationPolicyTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ProxySettingRestorationPolicyTests.m; sourceTree = "<group>"; };
+		C30800000000000000000003 /* ProxySettingRestorationPolicy.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ProxySettingRestorationPolicy.m; sourceTree = "<group>"; };
+		C30800000000000000000006 /* ProxySettingRestorationPolicy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ProxySettingRestorationPolicy.h; sourceTree = "<group>"; };
 		06252EC2F039BCAFB08D62E4 /* DNSConfigViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DNSConfigViewController.swift; sourceTree = "<group>"; };
 		0AD7506A2A5B9A04001FFBBD /* ConnectionLeftPannelViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionLeftPannelViewModel.swift; sourceTree = "<group>"; };
 		0AD7506C2A5B9B26001FFBBD /* ConnectionLeftTextCellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionLeftTextCellView.swift; sourceTree = "<group>"; };
@@ -420,6 +426,7 @@
 			children = (
 				C30100000000000000000001 /* BenchmarkRegressionTests.swift */,
 				C30100000000000000000015 /* BenchmarkRegressionSupport.swift */,
+				C30800000000000000000001 /* ProxySettingRestorationPolicyTests.m */,
 			);
 			path = ClashFXTests;
 			sourceTree = "<group>";
@@ -825,6 +832,8 @@
 				F935B2F52307D00D009E4D33 /* ProxyConfigRemoteProcessProtocol.h */,
 				F935B2F823083EE6009E4D33 /* ProxySettingTool.h */,
 				F935B2F923083EE6009E4D33 /* ProxySettingTool.m */,
+				C30800000000000000000006 /* ProxySettingRestorationPolicy.h */,
+				C30800000000000000000003 /* ProxySettingRestorationPolicy.m */,
 			);
 			path = ProxyConfigHelper;
 			sourceTree = "<group>";
@@ -1080,6 +1089,8 @@
 				C30500000000000000000003 /* ShortcutScope.swift in Sources */,
 				C30600000000000000000003 /* ManagedOperationSettlement.swift in Sources */,
 				C30700000000000000000003 /* SystemProxyOperationPolicy.swift in Sources */,
+				C30800000000000000000002 /* ProxySettingRestorationPolicyTests.m in Sources */,
+				C30800000000000000000004 /* ProxySettingRestorationPolicy.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1224,6 +1235,7 @@
 				F9A7C06C2306E874007163C7 /* main.m in Sources */,
 				491E6203258A424D00313AEF /* CommonUtils.m in Sources */,
 				F935B2FA23083EE6009E4D33 /* ProxySettingTool.m in Sources */,
+				C30800000000000000000005 /* ProxySettingRestorationPolicy.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

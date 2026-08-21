@@ -10,6 +10,10 @@
 #import <SystemConfiguration/SystemConfiguration.h>
 #import <AppKit/AppKit.h>
 #import "CommonUtils.h"
+#import "ProxySettingRestorationPolicy.h"
+
+static NSString * const ClashFXProxyCaptureErrorKey = @"__ClashFXProxyCaptureError";
+static NSString * const ClashFXCapturedServiceIDsKey = @"__ClashFXCapturedServiceIDs";
 
 @interface ProxySettingTool()
 @property (nonatomic, assign) AuthorizationRef authRef;
@@ -62,47 +66,18 @@
     return [self applySCNetworkSettingWithRef:^NSString *(SCPreferencesRef ref) {
         __block NSString *error = nil;
         [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:filterInterface devices:^(NSString *key, NSDictionary *dict) {
-            NSDictionary *proxySetting = savedInfo[key];
-            if (![proxySetting isKindOfClass:[NSDictionary class]]) {
-                proxySetting = nil;
-            }
-            
-            if (!proxySetting) {
-                if (!error) {
-                    error = [self disableProxySetting:ref interface:key];
-                }
+            if (error) {
                 return;
             }
-            
-            int savedHttpPort = ((NSNumber *)(proxySetting[(__bridge NSString *)kCFNetworkProxiesHTTPPort])).intValue;
-            int savedHttpsPort = ((NSNumber *)(proxySetting[(__bridge NSString *)kCFNetworkProxiesHTTPSPort])).intValue;
-            int savedSocksPort = ((NSNumber *)(proxySetting[(__bridge NSString *)kCFNetworkProxiesSOCKSPort])).intValue;
-            
-            
-            BOOL shouldIgnoreAndReset =
-            [proxySetting[(__bridge NSString *)kCFNetworkProxiesHTTPProxy] isEqualToString:@"127.0.0.1"] &&
-            [proxySetting[(__bridge NSString *)kCFNetworkProxiesSOCKSProxy] isEqualToString:@"127.0.0.1"] &&
-            ((NSNumber *)(proxySetting[(__bridge NSString *)kCFNetworkProxiesHTTPEnable])).boolValue &&
-            ((NSNumber *)(proxySetting[(__bridge NSString *)kCFNetworkProxiesHTTPSEnable])).boolValue&&
-            savedHttpPort == port&&
-            savedHttpsPort == port&&
-            savedSocksPort== socksPort;
-            
-            if (savedHttpPort <= 0 || savedHttpsPort <= 0 || savedSocksPort <=0) {
-                shouldIgnoreAndReset = YES;
-            }
-            
-            if (shouldIgnoreAndReset) {
-                if (!error) {
-                    error = [self disableProxySetting:ref interface:key];
-                }
-                return;
-            }
-            
-            if (!error) {
+            BOOL shouldRemove = NO;
+            NSDictionary *proxySetting = [ProxySettingRestorationPolicy proxyDictionaryForServiceID:key
+                                                                                           snapshot:savedInfo
+                                                                                       shouldRemove:&shouldRemove];
+            if (shouldRemove) {
+                error = [self removeProxyConfig:ref interface:key];
+            } else {
                 error = [self setProxyConfig:ref interface:key proxySetting:proxySetting];
             }
-            
         }];
         return error;
     }];
@@ -111,10 +86,21 @@
 + (NSMutableDictionary<NSString *,NSDictionary *> *)currentProxySettings {
     __block NSMutableDictionary<NSString *,NSDictionary *> *info = [NSMutableDictionary dictionary];
     SCPreferencesRef ref = SCPreferencesCreate(nil, CFSTR("ClashFX"), nil);
-    [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:YES devices:^(NSString *key, NSDictionary *dev) {
+    if (!ref) {
+        info[ClashFXProxyCaptureErrorKey] = @"Unable to create system network preferences for proxy capture";
+        return info;
+    }
+    NSMutableArray<NSString *> *serviceIDs = [NSMutableArray array];
+    [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:NO devices:^(NSString *key, NSDictionary *dev) {
+        [serviceIDs addObject:key];
         NSDictionary *proxySettings = dev[(__bridge NSString *)kSCEntNetProxies];
-        info[key] = [proxySettings copy];
+        if ([proxySettings isKindOfClass:[NSDictionary class]]) {
+            // Keep the property-list payload byte-for-byte. Do not synthesize
+            // disabled keys for a partial/PAC-only proxy configuration.
+            info[key] = [proxySettings copy];
+        }
     }];
+    info[ClashFXCapturedServiceIDsKey] = [serviceIDs copy];
     CFRelease(ref);
     
     return info;
@@ -209,10 +195,21 @@
     return nil;
 }
 
+- (nullable NSString *)removeProxyConfig:(SCPreferencesRef)prefs interface:(NSString *)interfaceKey {
+    NSString *path = [self proxySettingPathWithInterface:interfaceKey];
+    if (!SCPreferencesPathRemoveValue(prefs, (__bridge CFStringRef)path)) {
+        return [self preferenceErrorMessageForOperation:@"removing proxy preferences"];
+    }
+    return nil;
+}
+
 + (void)getDiviceListWithPrefRef:(SCPreferencesRef)ref
                  filterInterface:(BOOL)filterInterface
                          devices:(void(^)(NSString *, NSDictionary *))callback {
     NSDictionary *sets = (__bridge NSDictionary *)SCPreferencesGetValue(ref, kSCPrefNetworkServices);
+    if (![sets isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
     for (NSString *key in [sets allKeys]) {
         NSMutableDictionary *dict = [sets objectForKey:key];
         NSString *hardware = [dict valueForKeyPath:@"Interface.Hardware"];
