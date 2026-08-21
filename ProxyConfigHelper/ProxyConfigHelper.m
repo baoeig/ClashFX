@@ -648,16 +648,14 @@ static BOOL RunTaskWithTimeout(NSString *executablePath,
             error:(stringReplyBlock)reply {
     dispatch_async(dispatch_get_main_queue(), ^{
         ProxySettingTool *tool = [ProxySettingTool new];
-        [tool enableProxyWithport:port socksPort:socksPort pacUrl:pac filterInterface:filterInterface ignoreList:ignoreList];
-        reply(nil);
+        reply([tool enableProxyWithport:port socksPort:socksPort pacUrl:pac filterInterface:filterInterface ignoreList:ignoreList]);
     });
 }
 
 - (void)disableProxyWithFilterInterface:(BOOL)filterInterface reply:(stringReplyBlock)reply {
     dispatch_async(dispatch_get_main_queue(), ^{
         ProxySettingTool *tool = [ProxySettingTool new];
-        [tool disableProxyWithfilterInterface:filterInterface];
-        reply(nil);
+        reply([tool disableProxyWithfilterInterface:filterInterface]);
     });
 }
 
@@ -669,8 +667,7 @@ static BOOL RunTaskWithTimeout(NSString *executablePath,
                               error:(stringReplyBlock)reply {
     dispatch_async(dispatch_get_main_queue(), ^{
         ProxySettingTool *tool = [ProxySettingTool new];
-        [tool restoreProxySetting:dict currentPort:port currentSocksPort:socksPort filterInterface:filterInterface];
-        reply(nil);
+        reply([tool restoreProxySetting:dict currentPort:port currentSocksPort:socksPort filterInterface:filterInterface]);
     });
 }
 

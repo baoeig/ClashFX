@@ -27,31 +27,40 @@
 
 // MARK: - Public
 
-- (void)enableProxyWithport:(int)port socksPort:(int)socksPort
+- (nullable NSString *)enableProxyWithport:(int)port socksPort:(int)socksPort
                      pacUrl:(NSString *)pacUrl
             filterInterface:(BOOL)filterInterface
                  ignoreList:(NSArray<NSString *>*)ignoreList {
 
-    [self applySCNetworkSettingWithRef:^(SCPreferencesRef ref) {
+    return [self applySCNetworkSettingWithRef:^NSString *(SCPreferencesRef ref) {
+        __block NSString *error = nil;
         [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:filterInterface devices:^(NSString *key, NSDictionary *dict) {
-            [self enableProxySettings:ref interface:key port:port socksPort:socksPort ignoreList:ignoreList pac:pacUrl];
+            if (!error) {
+                error = [self enableProxySettings:ref interface:key port:port socksPort:socksPort ignoreList:ignoreList pac:pacUrl];
+            }
         }];
+        return error;
     }];
 }
 
-- (void)disableProxyWithfilterInterface:(BOOL)filterInterface {
-    [self applySCNetworkSettingWithRef:^(SCPreferencesRef ref) {
+- (nullable NSString *)disableProxyWithfilterInterface:(BOOL)filterInterface {
+    return [self applySCNetworkSettingWithRef:^NSString *(SCPreferencesRef ref) {
+        __block NSString *error = nil;
         [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:filterInterface devices:^(NSString *key, NSDictionary *dict) {
-            [self disableProxySetting:ref interface:key];
+            if (!error) {
+                error = [self disableProxySetting:ref interface:key];
+            }
         }];
+        return error;
     }];
 }
 
-- (void)restoreProxySetting:(NSDictionary *)savedInfo
+- (nullable NSString *)restoreProxySetting:(NSDictionary *)savedInfo
                 currentPort:(int)port
            currentSocksPort:(int)socksPort
             filterInterface:(BOOL)filterInterface{
-    [self applySCNetworkSettingWithRef:^(SCPreferencesRef ref) {
+    return [self applySCNetworkSettingWithRef:^NSString *(SCPreferencesRef ref) {
+        __block NSString *error = nil;
         [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:filterInterface devices:^(NSString *key, NSDictionary *dict) {
             NSDictionary *proxySetting = savedInfo[key];
             if (![proxySetting isKindOfClass:[NSDictionary class]]) {
@@ -59,7 +68,9 @@
             }
             
             if (!proxySetting) {
-                [self disableProxySetting:ref interface:key];
+                if (!error) {
+                    error = [self disableProxySetting:ref interface:key];
+                }
                 return;
             }
             
@@ -82,13 +93,18 @@
             }
             
             if (shouldIgnoreAndReset) {
-                [self disableProxySetting:ref interface:key];
+                if (!error) {
+                    error = [self disableProxySetting:ref interface:key];
+                }
                 return;
             }
             
-            [self setProxyConfig:ref interface:key proxySetting:proxySetting];
+            if (!error) {
+                error = [self setProxyConfig:ref interface:key proxySetting:proxySetting];
+            }
             
         }];
+        return error;
     }];
 }
 
@@ -163,7 +179,7 @@
             (NSString *)kSCEntNetProxies];
 }
 
-- (void)enableProxySettings:(SCPreferencesRef)prefs
+- (nullable NSString *)enableProxySettings:(SCPreferencesRef)prefs
                   interface:(NSString *)interfaceKey
                        port:(int) port
                   socksPort:(int) socksPort
@@ -171,23 +187,26 @@
                         pac:(NSString *)pac {
     
     NSDictionary *proxySettings = [self getProxySetting:YES port:port socksPort:socksPort pac:pac ignoreList:ignoreList];
-    [self setProxyConfig:prefs interface:interfaceKey proxySetting:proxySettings];
+    return [self setProxyConfig:prefs interface:interfaceKey proxySetting:proxySettings];
     
 }
 
-- (void)disableProxySetting:(SCPreferencesRef)prefs
+- (nullable NSString *)disableProxySetting:(SCPreferencesRef)prefs
                   interface:(NSString *)interfaceKey {
     NSDictionary *proxySettings = [self getProxySetting:NO port:0 socksPort:0 pac:nil ignoreList:@[]];
-    [self setProxyConfig:prefs interface:interfaceKey proxySetting:proxySettings];
+    return [self setProxyConfig:prefs interface:interfaceKey proxySetting:proxySettings];
 }
 
-- (void)setProxyConfig:(SCPreferencesRef)prefs
+- (nullable NSString *)setProxyConfig:(SCPreferencesRef)prefs
              interface:(NSString *)interfaceKey
           proxySetting:(NSDictionary *)proxySettings {
     NSString *path = [self proxySettingPathWithInterface:interfaceKey];
-    SCPreferencesPathSetValue(prefs,
-                              (__bridge CFStringRef)path,
-                              (__bridge CFDictionaryRef)proxySettings);
+    if (!SCPreferencesPathSetValue(prefs,
+                                   (__bridge CFStringRef)path,
+                                   (__bridge CFDictionaryRef)proxySettings)) {
+        return [self preferenceErrorMessageForOperation:@"setting proxy preferences"];
+    }
+    return nil;
 }
 
 + (void)getDiviceListWithPrefRef:(SCPreferencesRef)ref
@@ -206,17 +225,41 @@
     }
 }
 
-- (void)applySCNetworkSettingWithRef:(void(^)(SCPreferencesRef))callback {
+- (NSString *)preferenceErrorMessageForOperation:(NSString *)operation {
+    const char *errorString = SCErrorString(SCError());
+    NSString *detail = errorString ? [NSString stringWithUTF8String:errorString] : @"unknown error";
+    return [NSString stringWithFormat:@"Unable to %@: %@", operation, detail];
+}
+
+- (nullable NSString *)applySCNetworkSettingWithRef:(NSString *(^)(SCPreferencesRef))callback {
     SCPreferencesRef ref = SCPreferencesCreateWithAuthorization(nil, CFSTR("com.clashfx.app.Helper.config"), nil, self.authRef);
     if (!ref) {
-        return;
+        return @"Unable to create authorized system network preferences";
     }
-    callback(ref);
+    NSString *callbackError = callback(ref);
+    if (callbackError) {
+        CFRelease(ref);
+        return callbackError;
+    }
     
-    SCPreferencesCommitChanges(ref);
-    SCPreferencesApplyChanges(ref);
+    if (!SCPreferencesCommitChanges(ref)) {
+        NSString *error = [self preferenceErrorMessageForOperation:@"committing system network preferences"];
+        CFRelease(ref);
+        return error;
+    }
+    if (!SCPreferencesApplyChanges(ref)) {
+        NSString *error = [self preferenceErrorMessageForOperation:@"applying system network preferences"];
+        CFRelease(ref);
+        return error;
+    }
     SCPreferencesSynchronize(ref);
+    if (SCError() != kSCStatusOK) {
+        NSString *error = [self preferenceErrorMessageForOperation:@"synchronizing system network preferences"];
+        CFRelease(ref);
+        return error;
+    }
     CFRelease(ref);
+    return nil;
 }
 
 - (AuthorizationFlags)authFlags {
@@ -260,7 +303,7 @@
 
 - (void)overrideDNSWithServers:(NSArray<NSString *> *)servers
                filterInterface:(BOOL)filterInterface {
-    [self applySCNetworkSettingWithRef:^(SCPreferencesRef ref) {
+    [self applySCNetworkSettingWithRef:^NSString *(SCPreferencesRef ref) {
         [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:filterInterface devices:^(NSString *key, NSDictionary *dict) {
             NSString *path = [self dnsSettingPathWithInterface:key];
             NSDictionary *dnsSettings = @{
@@ -270,12 +313,13 @@
                                       (__bridge CFStringRef)path,
                                       (__bridge CFDictionaryRef)dnsSettings);
         }];
+        return nil;
     }];
 }
 
 - (void)restoreDNS:(NSDictionary *)savedInfo
     filterInterface:(BOOL)filterInterface {
-    [self applySCNetworkSettingWithRef:^(SCPreferencesRef ref) {
+    [self applySCNetworkSettingWithRef:^NSString *(SCPreferencesRef ref) {
         [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:filterInterface devices:^(NSString *key, NSDictionary *dict) {
             NSString *path = [self dnsSettingPathWithInterface:key];
             NSDictionary *dnsSettings = savedInfo[key];
@@ -287,6 +331,7 @@
                 SCPreferencesPathRemoveValue(ref, (__bridge CFStringRef)path);
             }
         }];
+        return nil;
     }];
 }
 
