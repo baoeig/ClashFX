@@ -23,7 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
                 currentPort:(int)port
            currentSocksPort:(int)socksPort
             filterInterface:(BOOL)filterInterface;
-+ (NSMutableDictionary<NSString *,NSDictionary *> *)currentProxySettings;
++ (NSMutableDictionary<NSString *, id> *)currentProxySettings;
 
 - (void)overrideDNSWithServers:(NSArray<NSString *> *)servers
                filterInterface:(BOOL)filterInterface;

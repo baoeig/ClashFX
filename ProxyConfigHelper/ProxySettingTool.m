@@ -86,8 +86,8 @@ static NSString * const ClashFXCapturedServiceIDsKey = @"__ClashFXCapturedServic
     }];
 }
 
-+ (NSMutableDictionary<NSString *,NSDictionary *> *)currentProxySettings {
-    __block NSMutableDictionary<NSString *,NSDictionary *> *info = [NSMutableDictionary dictionary];
++ (NSMutableDictionary<NSString *, id> *)currentProxySettings {
+    __block NSMutableDictionary<NSString *, id> *info = [NSMutableDictionary dictionary];
     SCPreferencesRef ref = SCPreferencesCreate(nil, CFSTR("ClashFX"), nil);
     if (!ref) {
         info[ClashFXProxyCaptureErrorKey] = @"Unable to create system network preferences for proxy capture";
