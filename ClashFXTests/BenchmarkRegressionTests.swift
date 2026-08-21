@@ -152,6 +152,75 @@ final class ManagedOperationSettlementTests: XCTestCase {
     }
 }
 
+final class SystemProxyOperationPolicyTests: XCTestCase {
+    private func clashSnapshot(httpPort: Int = 7890, socksPort: Int = 7891) -> [String: Any] {
+        return [
+            "wifi": [
+                "HTTPEnable": 1,
+                "HTTPProxy": "127.0.0.1",
+                "HTTPPort": httpPort,
+                "HTTPSEnable": 1,
+                "HTTPSProxy": "127.0.0.1",
+                "HTTPSPort": httpPort,
+                "SOCKSEnable": 1,
+                "SOCKSProxy": "127.0.0.1",
+                "SOCKSPort": socksPort,
+            ],
+        ]
+    }
+
+    func testGenerationRejectsObsoleteCaptureCallback() {
+        var policy = SystemProxyOperationPolicy()
+        let first = policy.beginTransition()
+        let second = policy.beginTransition()
+
+        XCTAssertNotEqual(first, second)
+        XCTAssertFalse(policy.acceptsCallback(for: first))
+        XCTAssertTrue(policy.acceptsCallback(for: second))
+    }
+
+    func testOnlyFullyMatchingLoopbackSnapshotIsOwnedByClashFX() {
+        XCTAssertTrue(SystemProxyOperationPolicy.isClashFXOwnedSnapshot(clashSnapshot(), httpPort: 7890, socksPort: 7891))
+
+        var partial = clashSnapshot()
+        partial["wifi"] = [
+            "HTTPEnable": 1,
+            "HTTPProxy": "127.0.0.1",
+            "HTTPPort": 7890,
+            "HTTPSEnable": 1,
+            "HTTPSProxy": "127.0.0.1",
+            "HTTPSPort": 7890,
+            "SOCKSEnable": 0,
+        ]
+        XCTAssertFalse(SystemProxyOperationPolicy.isClashFXOwnedSnapshot(partial, httpPort: 7890, socksPort: 7891))
+    }
+
+    func testPACAndPartialSnapshotsRemainValidPropertyLists() {
+        let snapshot: [String: Any] = [
+            "wifi": [
+                "HTTPEnable": 1,
+                "HTTPProxy": "proxy.example",
+                "HTTPPort": 8080,
+                "HTTPSEnable": 1,
+                "HTTPSProxy": "secure.example",
+                "HTTPSPort": 8443,
+                "SOCKSEnable": 0,
+                "ProxyAutoConfigEnable": 1,
+                "ProxyAutoConfigURLString": "https://pac.example/proxy.pac",
+                "ExceptionsList": ["localhost", "*.local"],
+            ],
+            SystemProxyOperationPolicy.capturedServiceIDsKey: ["wifi", "ethernet"],
+        ]
+        XCTAssertTrue(SystemProxyOperationPolicy.isValidPropertyListSnapshot(snapshot))
+        XCTAssertFalse(SystemProxyOperationPolicy.isClashFXOwnedSnapshot(snapshot, httpPort: 7890, socksPort: 7891))
+    }
+
+    func testCaptureErrorIsRecognizedBeforeSnapshotPersistence() {
+        let snapshot: [String: Any] = [SystemProxyOperationPolicy.captureErrorKey: "preferences unavailable"]
+        XCTAssertEqual(SystemProxyOperationPolicy.captureError(in: snapshot), "preferences unavailable")
+    }
+}
+
 final class TerminationCleanupPolicyTests: XCTestCase {
     func testNoCleanupDoesNotWait() {
         let policy = TerminationCleanupPolicy.make(observation: TerminationCleanupObservation(
