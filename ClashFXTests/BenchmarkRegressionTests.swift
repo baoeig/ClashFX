@@ -190,6 +190,65 @@ final class TerminationCleanupPolicyTests: XCTestCase {
     }
 }
 
+final class ManagedRemoteUpdateSettlementTests: XCTestCase {
+    private final class Harness {
+        var completionCount = 0
+        var updating = true
+        var updateTime: Date?
+        lazy var settlement: ManagedOperationSettlement<String?> = ManagedOperationSettlement<String?> { [weak self] error in
+            guard let self = self else { return }
+            self.completionCount += 1
+            self.updating = false
+            if error == nil {
+                self.updateTime = Date()
+            }
+        }
+
+        func finish(_ error: String?) -> Bool {
+            settlement.finish(error)
+        }
+    }
+
+    func testSuccessClearsUpdatingAndRecordsTimestampOnce() {
+        let harness = Harness()
+
+        XCTAssertTrue(harness.finish(nil))
+        XCTAssertFalse(harness.finish("late failure"))
+        XCTAssertEqual(harness.completionCount, 1)
+        XCTAssertFalse(harness.updating)
+        XCTAssertNotNil(harness.updateTime)
+    }
+
+    func testSetupFailureClearsUpdatingWithoutTimestamp() {
+        let harness = Harness()
+
+        XCTAssertTrue(harness.finish("setup failed"))
+        XCTAssertEqual(harness.completionCount, 1)
+        XCTAssertFalse(harness.updating)
+        XCTAssertNil(harness.updateTime)
+    }
+
+    func testTimeoutRejectsLateNetworkResult() {
+        let harness = Harness()
+
+        XCTAssertTrue(harness.finish("timeout"))
+        XCTAssertFalse(harness.finish(nil))
+        XCTAssertEqual(harness.completionCount, 1)
+        XCTAssertFalse(harness.updating)
+        XCTAssertNil(harness.updateTime)
+    }
+
+    func testCallbackRejectsLateTimeout() {
+        let harness = Harness()
+
+        XCTAssertTrue(harness.finish(nil))
+        XCTAssertFalse(harness.finish("timeout"))
+        XCTAssertEqual(harness.completionCount, 1)
+        XCTAssertFalse(harness.updating)
+        XCTAssertNotNil(harness.updateTime)
+    }
+}
+
 final class BenchmarkRegressionTests: XCTestCase {
     private func snapshot(_ proxyJSON: [[String: Any]]) -> ClashProxyResp {
         let proxies = Dictionary(uniqueKeysWithValues: proxyJSON.compactMap { proxy -> (String, Any)? in

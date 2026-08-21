@@ -142,8 +142,9 @@ extension RemoteConfigViewController {
         config.updating = true
         RemoteConfigManager.updateConfig(config: config) {
             [weak self, weak config] errorString in
-            guard let self = self, let config = config else { return }
+            guard let config = config else { return }
             config.updating = false
+            guard let self = self else { return }
             if let errorString = errorString {
                 let alert = NSAlert()
                 alert.messageText = errorString

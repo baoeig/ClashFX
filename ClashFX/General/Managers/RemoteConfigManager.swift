@@ -10,6 +10,7 @@ import Alamofire
 import Cocoa
 
 class RemoteConfigManager {
+    private static let remoteConfigUpdateTimeout: TimeInterval = 60
     private static let generatedShareLinkTemplateVersion = 8
     private static let generatedShareLinkMarker = "clashfx-generated: share-links"
     private static let generatedShareLinkMigrationKey = "kGeneratedShareLinkRemoteConfigMigrationVersion"
@@ -109,12 +110,11 @@ class RemoteConfigManager {
             let isCurrentConfig = config.name == currentConfigName
             config.updating = true
             group.enter()
-            RemoteConfigManager.updateConfig(config: config) {
-                [weak config] error in
+            RemoteConfigManager.updateConfig(config: config) { [weak config] error in
+                group.leave()
                 guard let config = config else { return }
 
                 config.updating = false
-                group.leave()
                 if error == nil {
                     config.updateTime = Date()
                 }
@@ -157,18 +157,21 @@ class RemoteConfigManager {
     /// those providers expose to compatible clients.
     private static let subscriptionUserAgent = "clash.meta/v1.19.24"
 
-    static func getRemoteConfigData(config: RemoteConfigModel, complete: @escaping ((String?, String?, [AnyHashable: Any]?) -> Void)) {
+    @discardableResult
+    static func getRemoteConfigData(config: RemoteConfigModel, complete: @escaping ((String?, String?, [AnyHashable: Any]?) -> Void)) -> DataRequest? {
         guard var urlRequest = try? URLRequest(url: config.url, method: .get) else {
             assertionFailure()
             Logger.log("[getRemoteConfigData] url incorrect,\(config.name) \(config.url)")
-            return
+            complete(nil, nil, nil)
+            return nil
         }
         urlRequest.cachePolicy = .reloadIgnoringCacheData
+        urlRequest.timeoutInterval = remoteConfigUpdateTimeout
         let userAgent = config.userAgent?.trimmingCharacters(in: .whitespacesAndNewlines)
         urlRequest.setValue(userAgent?.isEmpty == false ? userAgent : subscriptionUserAgent,
                             forHTTPHeaderField: "User-Agent")
 
-        AF.request(urlRequest)
+        return AF.request(urlRequest)
             .validate()
             .responseString(encoding: .utf8) { res in
                 complete(try? res.result.get(), res.response?.suggestedFilename, res.response?.allHeaderFields)
@@ -1120,9 +1123,22 @@ class RemoteConfigManager {
     }
 
     static func updateConfig(config: RemoteConfigModel, complete: ((String?) -> Void)? = nil) {
-        getRemoteConfigData(config: config) { configString, suggestedFilename, responseHeaders in
+        var request: DataRequest?
+        let settlement = ManagedOperationSettlement<String?> { error in
+            DispatchQueue.main.async {
+                complete?(error)
+            }
+        }
+        settlement.scheduleTimeout(after: remoteConfigUpdateTimeout, queue: .global(qos: .utility), outcome: {
+            request?.cancel()
+            Logger.log("[Remote Config] Update timed out for \(config.name)", level: .error)
+            return NSLocalizedString("Remote Config Update Timed Out", comment: "")
+        })
+
+        request = getRemoteConfigData(config: config) { configString, suggestedFilename, responseHeaders in
+            guard !settlement.isSettled else { return }
             guard let rawConfig = configString else {
-                complete?(NSLocalizedString("Download fail", comment: ""))
+                _ = settlement.finish(NSLocalizedString("Download fail", comment: ""))
                 return
             }
 
@@ -1150,7 +1166,7 @@ class RemoteConfigManager {
 
             let verifyRes = verifyConfig(string: newConfig)
             if let error = verifyRes {
-                complete?(NSLocalizedString("Remote Config Format Error", comment: "") + ": " + error)
+                _ = settlement.finish(NSLocalizedString("Remote Config Format Error", comment: "") + ": " + error)
                 return
             }
 
@@ -1177,6 +1193,7 @@ class RemoteConfigManager {
 
             let saveAction: ((URL) -> Void) = {
                 saveURL in
+                guard !settlement.isSettled else { return }
                 do {
                     if FileManager.default.fileExists(atPath: saveURL.path) {
                         try FileManager.default.removeItem(at: saveURL)
@@ -1195,18 +1212,22 @@ class RemoteConfigManager {
                     if shouldRestartConfigWatcher {
                         ConfigManager.watchCurrentConfigFile()
                     }
-                    complete?(nil)
+                    _ = settlement.finish(nil)
                 } catch let err {
                     if shouldRestartConfigWatcher {
                         ConfigManager.watchCurrentConfigFile()
                     }
-                    complete?(err.localizedDescription)
+                    _ = settlement.finish(err.localizedDescription)
                 }
             }
 
             if ICloudManager.shared.useiCloud.value {
                 ICloudManager.shared.getUrl { url in
-                    guard let url = url else { return }
+                    guard !settlement.isSettled else { return }
+                    guard let url = url else {
+                        _ = settlement.finish(NSLocalizedString("iCloud Config Location Unavailable", comment: ""))
+                        return
+                    }
                     let saveUrl = url.appendingPathComponent(Paths.configFileName(for: config.name))
                     saveAction(saveUrl)
                 }

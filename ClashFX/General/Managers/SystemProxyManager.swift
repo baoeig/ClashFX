@@ -21,6 +21,10 @@ class SystemProxyManager: NSObject {
         }
     }
 
+    private var helper: ProxyConfigRemoteProcessProtocol? {
+        PrivilegedHelperManager.shared.helper()
+    }
+
     func saveProxy() {
         guard !Settings.disableRestoreProxy else { return }
         Logger.log("saveProxy", level: .debug)
