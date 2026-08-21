@@ -252,12 +252,10 @@
         CFRelease(ref);
         return error;
     }
+    // SystemConfiguration exposes synchronization as a void operation, so it
+    // cannot provide a reliable per-call failure result. In particular, do
+    // not inspect SCError() here: it may describe an earlier operation.
     SCPreferencesSynchronize(ref);
-    if (SCError() != kSCStatusOK) {
-        NSString *error = [self preferenceErrorMessageForOperation:@"synchronizing system network preferences"];
-        CFRelease(ref);
-        return error;
-    }
     CFRelease(ref);
     return nil;
 }

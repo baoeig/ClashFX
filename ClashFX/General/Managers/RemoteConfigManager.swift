@@ -1129,7 +1129,10 @@ class RemoteConfigManager {
                 complete?(error)
             }
         }
-        settlement.scheduleTimeout(after: remoteConfigUpdateTimeout, queue: .global(qos: .utility), outcome: {
+        // Alamofire response handlers and iCloud URL resolution use the main
+        // queue. Keep timeout settlement there too so terminal checks, model
+        // mutation, and file writes cannot race one another.
+        settlement.scheduleTimeout(after: remoteConfigUpdateTimeout, queue: .main, outcome: {
             request?.cancel()
             Logger.log("[Remote Config] Update timed out for \(config.name)", level: .error)
             return NSLocalizedString("Remote Config Update Timed Out", comment: "")
