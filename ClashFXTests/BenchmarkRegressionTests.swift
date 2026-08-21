@@ -219,6 +219,60 @@ final class SystemProxyOperationPolicyTests: XCTestCase {
         let snapshot: [String: Any] = [SystemProxyOperationPolicy.captureErrorKey: "preferences unavailable"]
         XCTAssertEqual(SystemProxyOperationPolicy.captureError(in: snapshot), "preferences unavailable")
     }
+
+    func testLegacySnapshotMigrationRequiresLiveClashFXAndOriginalDictionary() {
+        let original: [String: Any] = [
+            "wifi": ["HTTPEnable": 1, "HTTPProxy": "proxy.example", "HTTPPort": 8080],
+        ]
+        XCTAssertTrue(SystemProxyOperationPolicy.shouldMigrateLegacySnapshot(
+            original,
+            validityMarker: false,
+            liveSystemPointsToClashFX: true,
+            httpPort: 7890,
+            socksPort: 7891
+        ))
+        XCTAssertFalse(SystemProxyOperationPolicy.shouldMigrateLegacySnapshot(
+            original,
+            validityMarker: false,
+            liveSystemPointsToClashFX: false,
+            httpPort: 7890,
+            socksPort: 7891
+        ))
+        XCTAssertFalse(SystemProxyOperationPolicy.shouldMigrateLegacySnapshot(
+            original,
+            validityMarker: true,
+            liveSystemPointsToClashFX: true,
+            httpPort: 7890,
+            socksPort: 7891
+        ))
+    }
+
+    func testLegacyClashFXSnapshotCannotBeMigrated() {
+        XCTAssertFalse(SystemProxyOperationPolicy.shouldMigrateLegacySnapshot(
+            clashSnapshot(),
+            validityMarker: false,
+            liveSystemPointsToClashFX: true,
+            httpPort: 7890,
+            socksPort: 7891
+        ))
+    }
+
+    func testLegacyMigrationRejectsCaptureErrorsAndMalformedPayloads() {
+        XCTAssertFalse(SystemProxyOperationPolicy.shouldMigrateLegacySnapshot(
+            [SystemProxyOperationPolicy.captureErrorKey: "unavailable"],
+            validityMarker: false,
+            liveSystemPointsToClashFX: true,
+            httpPort: 7890,
+            socksPort: 7891
+        ))
+        XCTAssertFalse(SystemProxyOperationPolicy.shouldMigrateLegacySnapshot(
+            ["wifi": Set(["not a property list"])],
+            validityMarker: false,
+            liveSystemPointsToClashFX: true,
+            httpPort: 7890,
+            socksPort: 7891
+        ))
+    }
 }
 
 final class TerminationCleanupPolicyTests: XCTestCase {

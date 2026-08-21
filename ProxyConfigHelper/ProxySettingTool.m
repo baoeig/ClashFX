@@ -65,17 +65,20 @@ static NSString * const ClashFXCapturedServiceIDsKey = @"__ClashFXCapturedServic
             filterInterface:(BOOL)filterInterface{
     return [self applySCNetworkSettingWithRef:^NSString *(SCPreferencesRef ref) {
         __block NSString *error = nil;
-        [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:filterInterface devices:^(NSString *key, NSDictionary *dict) {
+        // Restore every current service. Captured dictionaries can be applied
+        // idempotently; the tri-state policy leaves services added after the
+        // capture untouched even if the user changed the filter while active.
+        [ProxySettingTool getDiviceListWithPrefRef:ref filterInterface:NO devices:^(NSString *key, NSDictionary *dict) {
             if (error) {
                 return;
             }
-            BOOL shouldRemove = NO;
+            ProxySettingRestorationAction action = ProxySettingRestorationActionLeaveUntouched;
             NSDictionary *proxySetting = [ProxySettingRestorationPolicy proxyDictionaryForServiceID:key
                                                                                            snapshot:savedInfo
-                                                                                       shouldRemove:&shouldRemove];
-            if (shouldRemove) {
+                                                                                             action:&action];
+            if (action == ProxySettingRestorationActionRemovePath) {
                 error = [self removeProxyConfig:ref interface:key];
-            } else {
+            } else if (action == ProxySettingRestorationActionApplyDictionary) {
                 error = [self setProxyConfig:ref interface:key proxySetting:proxySetting];
             }
         }];

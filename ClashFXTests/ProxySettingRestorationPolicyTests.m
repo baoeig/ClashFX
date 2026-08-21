@@ -6,8 +6,8 @@
 
 @implementation ProxySettingRestorationPolicyTests
 
-- (NSDictionary *)dictionaryForService:(NSString *)service inSnapshot:(NSDictionary *)snapshot remove:(BOOL *)remove {
-    return [ProxySettingRestorationPolicy proxyDictionaryForServiceID:service snapshot:snapshot shouldRemove:remove];
+- (NSDictionary *)dictionaryForService:(NSString *)service inSnapshot:(NSDictionary *)snapshot action:(ProxySettingRestorationAction *)action {
+    return [ProxySettingRestorationPolicy proxyDictionaryForServiceID:service snapshot:snapshot action:action];
 }
 
 - (void)testPartialAndPACSettingsAreReturnedUnchanged {
@@ -24,9 +24,9 @@
         @"ExceptionsList": @[@"localhost", @"*.local"],
         @"ExcludeSimpleHostnames": @1,
     };
-    BOOL remove = YES;
-    NSDictionary *result = [self dictionaryForService:@"wifi" inSnapshot:@{ @"wifi": partial } remove:&remove];
-    XCTAssertFalse(remove);
+    ProxySettingRestorationAction action = ProxySettingRestorationActionLeaveUntouched;
+    NSDictionary *result = [self dictionaryForService:@"wifi" inSnapshot:@{ @"wifi": partial } action:&action];
+    XCTAssertEqual(action, ProxySettingRestorationActionApplyDictionary);
     XCTAssertEqualObjects(result, partial);
 }
 
@@ -44,11 +44,11 @@
         @"SOCKSEnable": @0,
         @"ExceptionsList": @[@"localhost"],
     };
-    BOOL remove = YES;
-    XCTAssertEqualObjects([self dictionaryForService:@"wifi" inSnapshot:@{ @"wifi": socksOnly } remove:&remove], socksOnly);
-    XCTAssertFalse(remove);
-    XCTAssertEqualObjects([self dictionaryForService:@"ethernet" inSnapshot:@{ @"ethernet": disabled } remove:&remove], disabled);
-    XCTAssertFalse(remove);
+    ProxySettingRestorationAction action = ProxySettingRestorationActionLeaveUntouched;
+    XCTAssertEqualObjects([self dictionaryForService:@"wifi" inSnapshot:@{ @"wifi": socksOnly } action:&action], socksOnly);
+    XCTAssertEqual(action, ProxySettingRestorationActionApplyDictionary);
+    XCTAssertEqualObjects([self dictionaryForService:@"ethernet" inSnapshot:@{ @"ethernet": disabled } action:&action], disabled);
+    XCTAssertEqual(action, ProxySettingRestorationActionApplyDictionary);
 }
 
 - (void)testClashShapedDictionaryIsNotSilentlyChanged {
@@ -57,16 +57,27 @@
         @"HTTPSEnable": @1, @"HTTPSProxy": @"127.0.0.1", @"HTTPSPort": @7890,
         @"SOCKSEnable": @1, @"SOCKSProxy": @"127.0.0.1", @"SOCKSPort": @7891,
     };
-    BOOL remove = YES;
-    XCTAssertEqualObjects([self dictionaryForService:@"wifi" inSnapshot:@{ @"wifi": clashLike } remove:&remove], clashLike);
-    XCTAssertFalse(remove);
+    ProxySettingRestorationAction action = ProxySettingRestorationActionLeaveUntouched;
+    XCTAssertEqualObjects([self dictionaryForService:@"wifi" inSnapshot:@{ @"wifi": clashLike } action:&action], clashLike);
+    XCTAssertEqual(action, ProxySettingRestorationActionApplyDictionary);
 }
 
 - (void)testCapturedServiceWithoutProxyPathRequestsRemoval {
-    BOOL remove = NO;
+    ProxySettingRestorationAction action = ProxySettingRestorationActionLeaveUntouched;
     NSDictionary *snapshot = @{ @"__ClashFXCapturedServiceIDs": @[@"wifi"] };
-    XCTAssertNil([self dictionaryForService:@"wifi" inSnapshot:snapshot remove:&remove]);
-    XCTAssertTrue(remove);
+    XCTAssertNil([self dictionaryForService:@"wifi" inSnapshot:snapshot action:&action]);
+    XCTAssertEqual(action, ProxySettingRestorationActionRemovePath);
+}
+
+- (void)testNewAndLegacyUnknownServicesAreLeftUntouched {
+    ProxySettingRestorationAction action = ProxySettingRestorationActionApplyDictionary;
+    NSDictionary *newSnapshot = @{ @"__ClashFXCapturedServiceIDs": @[@"wifi"] };
+    XCTAssertNil([self dictionaryForService:@"new-service" inSnapshot:newSnapshot action:&action]);
+    XCTAssertEqual(action, ProxySettingRestorationActionLeaveUntouched);
+
+    NSDictionary *legacySnapshot = @{ @"wifi": @{ @"HTTPEnable": @0 } };
+    XCTAssertNil([self dictionaryForService:@"new-service" inSnapshot:legacySnapshot action:&action]);
+    XCTAssertEqual(action, ProxySettingRestorationActionLeaveUntouched);
 }
 
 @end

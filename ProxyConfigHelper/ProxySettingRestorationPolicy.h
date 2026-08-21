@@ -2,6 +2,12 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef NS_ENUM(NSInteger, ProxySettingRestorationAction) {
+    ProxySettingRestorationActionApplyDictionary,
+    ProxySettingRestorationActionRemovePath,
+    ProxySettingRestorationActionLeaveUntouched,
+};
+
 /// Selects an exact captured dictionary or an explicit path removal.  It is
 /// intentionally Foundation-only so regression tests can exercise the same
 /// rule as the privileged helper without touching SystemConfiguration.
@@ -9,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (nullable NSDictionary *)proxyDictionaryForServiceID:(NSString *)serviceID
                                                snapshot:(NSDictionary *)snapshot
-                                           shouldRemove:(BOOL *)shouldRemove;
+                                                action:(ProxySettingRestorationAction *)action;
 
 @end
 

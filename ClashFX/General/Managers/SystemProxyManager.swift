@@ -41,6 +41,22 @@ final class SystemProxyManager: NSObject {
         UserDefaults.standard.set(false, forKey: SystemProxyOperationPolicy.savedSnapshotValidityKey)
     }
 
+    private func migrateLegacySnapshotIfSafe(port: Int, socksPort: Int) -> Bool {
+        guard !hasValidSavedProxySnapshot else { return true }
+        let snapshot = savedProxyInfo
+        let mayMigrate = SystemProxyOperationPolicy.shouldMigrateLegacySnapshot(
+            snapshot,
+            validityMarker: false,
+            liveSystemPointsToClashFX: NetworkChangeNotifier.isCurrentSystemSetToClash(),
+            httpPort: port,
+            socksPort: socksPort
+        )
+        guard mayMigrate else { return false }
+        UserDefaults.standard.set(true, forKey: SystemProxyOperationPolicy.savedSnapshotValidityKey)
+        Logger.log("migrated legacy system proxy snapshot", level: .info)
+        return true
+    }
+
     /// Kept for old callers. Capture is deliberately an internal stage of the
     /// enable transition so it cannot race the privileged mutation.
     func saveProxy() {
@@ -84,7 +100,9 @@ final class SystemProxyManager: NSObject {
                 )
             }
 
-            guard !Settings.disableRestoreProxy, !self.hasValidSavedProxySnapshot else {
+            let canReuseSnapshot = self.hasValidSavedProxySnapshot ||
+                self.migrateLegacySnapshotIfSafe(port: port, socksPort: socksPort)
+            guard !Settings.disableRestoreProxy, !canReuseSnapshot else {
                 enable()
                 return
             }

@@ -32,6 +32,31 @@ struct SystemProxyOperationPolicy {
         return snapshot[captureErrorKey] as? String
     }
 
+    /// Old releases persisted only the dictionary, not its ownership marker.
+    /// It can be promoted exactly once, but only while the live system still
+    /// points at ClashFX and the dictionary is demonstrably a non-ClashFX,
+    /// property-list snapshot. Otherwise a fresh capture is safer.
+    static func shouldMigrateLegacySnapshot(
+        _ snapshot: [String: Any],
+        validityMarker: Bool,
+        liveSystemPointsToClashFX: Bool,
+        httpPort: Int,
+        socksPort: Int
+    ) -> Bool {
+        guard !validityMarker,
+              liveSystemPointsToClashFX,
+              !snapshot.isEmpty,
+              captureError(in: snapshot) == nil,
+              isValidPropertyListSnapshot(snapshot),
+              snapshot.contains(where: { key, value in
+                  !key.hasPrefix("__ClashFX") && value is [String: Any]
+              }),
+              !isClashFXOwnedSnapshot(snapshot, httpPort: httpPort, socksPort: socksPort) else {
+            return false
+        }
+        return true
+    }
+
     /// A snapshot is considered ClashFX-owned only when one of its service
     /// dictionaries fully matches the loopback proxy shape we write.  A
     /// partial proxy or PAC-only setup must never be treated as owned merely
