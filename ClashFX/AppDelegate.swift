@@ -2456,9 +2456,14 @@ extension AppDelegate {
     @objc func actionTurnOffAllProxyModes(_ sender: Any?) {
         if ConfigManager.shared.proxyPortAutoSet || ConfigManager.shared.isProxySetByOtherVariable.value {
             ConfigManager.shared.isProxySetByOtherVariable.accept(false)
-            ConfigManager.shared.proxyPortAutoSet = false
-            SystemProxyManager.shared.disableProxy()
-            proxySettingMenuItem.state = .off
+            SystemProxyManager.shared.disableProxy(result: { success in
+                guard success else {
+                    Logger.log("turning off system proxy failed; retaining proxy state for retry", level: .error)
+                    return
+                }
+                ConfigManager.shared.proxyPortAutoSet = false
+                self.proxySettingMenuItem.state = .off
+            })
         }
 
         guard Settings.enhancedMode || ConfigManager.shared.isEnhancedModeActive else {
@@ -3690,28 +3695,41 @@ extension AppDelegate {
     }
 
     @IBAction func actionSetSystemProxy(_ sender: Any?) {
-        var canSaveProxy = true
         if ConfigManager.shared.proxyPortAutoSet && ConfigManager.shared.proxyShouldPaused.value {
-            ConfigManager.shared.proxyPortAutoSet = false
+            disableSystemProxyFromUserAction()
         } else if ConfigManager.shared.isProxySetByOtherVariable.value {
-            // should reset proxy to clashx
+            enableSystemProxyFromUserAction(replacingExternalProxy: true)
+        } else if ConfigManager.shared.proxyPortAutoSet {
+            disableSystemProxyFromUserAction()
+        } else {
+            enableSystemProxyFromUserAction()
+        }
+    }
+
+    private func enableSystemProxyFromUserAction(replacingExternalProxy: Bool = false) {
+        let config = ConfigManager.shared.currentConfig
+        SystemProxyManager.shared.enableProxy(
+            port: config?.usedHttpPort ?? 0,
+            socksPort: config?.usedSocksPort ?? 0,
+            replacingExternalProxy: replacingExternalProxy
+        ) { success in
+            guard success else {
+                Logger.log("user-requested system proxy enable failed; leaving menu state unchanged", level: .error)
+                return
+            }
             ConfigManager.shared.isProxySetByOtherVariable.accept(false)
             ConfigManager.shared.proxyPortAutoSet = true
-            // clear then reset.
-            canSaveProxy = false
-            SystemProxyManager.shared.disableProxy(port: 0, socksPort: 0, forceDisable: true)
-        } else {
-            ConfigManager.shared.proxyPortAutoSet = !ConfigManager.shared.proxyPortAutoSet
         }
+    }
 
-        if ConfigManager.shared.proxyPortAutoSet {
-            if canSaveProxy {
-                SystemProxyManager.shared.saveProxy()
+    private func disableSystemProxyFromUserAction() {
+        SystemProxyManager.shared.disableProxy(result: { success in
+            guard success else {
+                Logger.log("user-requested system proxy disable failed; retaining menu state for retry", level: .error)
+                return
             }
-            SystemProxyManager.shared.enableProxy()
-        } else {
-            SystemProxyManager.shared.disableProxy()
-        }
+            ConfigManager.shared.proxyPortAutoSet = false
+        })
     }
 
     @IBAction func actionCopyExportCommand(_ sender: NSMenuItem) {

@@ -21,6 +21,8 @@
 		C30500000000000000000003 /* ShortcutScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30500000000000000000001 /* ShortcutScope.swift */; };
 		C30600000000000000000002 /* ManagedOperationSettlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30600000000000000000001 /* ManagedOperationSettlement.swift */; };
 		C30600000000000000000003 /* ManagedOperationSettlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30600000000000000000001 /* ManagedOperationSettlement.swift */; };
+		C30700000000000000000002 /* SystemProxyOperationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30700000000000000000001 /* SystemProxyOperationPolicy.swift */; };
+		C30700000000000000000003 /* SystemProxyOperationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30700000000000000000001 /* SystemProxyOperationPolicy.swift */; };
 		03B729DE29C62F46117B82A2 /* LabSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6174820C53D16D319C2DB8E /* LabSupport.swift */; };
 		079C0498F443DE06CFD1A2E0 /* FormHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1541315BE9AC1A5200C8FDA /* FormHelpers.swift */; };
 		0AD7506B2A5B9A04001FFBBD /* ConnectionLeftPannelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD7506A2A5B9A04001FFBBD /* ConnectionLeftPannelViewModel.swift */; };
@@ -210,6 +212,7 @@
 		C30400000000000000000001 /* BenchmarkURLSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkURLSettings.swift; sourceTree = "<group>"; };
 		C30500000000000000000001 /* ShortcutScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutScope.swift; sourceTree = "<group>"; };
 		C30600000000000000000001 /* ManagedOperationSettlement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Utils/ManagedOperationSettlement.swift; sourceTree = "<group>"; };
+		C30700000000000000000001 /* SystemProxyOperationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Utils/SystemProxyOperationPolicy.swift; sourceTree = "<group>"; };
 		06252EC2F039BCAFB08D62E4 /* DNSConfigViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DNSConfigViewController.swift; sourceTree = "<group>"; };
 		0AD7506A2A5B9A04001FFBBD /* ConnectionLeftPannelViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionLeftPannelViewModel.swift; sourceTree = "<group>"; };
 		0AD7506C2A5B9B26001FFBBD /* ConnectionLeftTextCellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionLeftTextCellView.swift; sourceTree = "<group>"; };
@@ -487,6 +490,7 @@
 				C30400000000000000000001 /* BenchmarkURLSettings.swift */,
 				C30500000000000000000001 /* ShortcutScope.swift */,
 				C30600000000000000000001 /* ManagedOperationSettlement.swift */,
+				C30700000000000000000001 /* SystemProxyOperationPolicy.swift */,
 				495BFB8721919B9800C8779D /* RemoteConfigManager.swift */,
 				4952C3BE2115C7CA004A4FA8 /* MenuItemFactory.swift */,
 				F935B2FB23085515009E4D33 /* SystemProxyManager.swift */,
@@ -1075,6 +1079,7 @@
 				C30400000000000000000003 /* BenchmarkURLSettings.swift in Sources */,
 				C30500000000000000000003 /* ShortcutScope.swift in Sources */,
 				C30600000000000000000003 /* ManagedOperationSettlement.swift in Sources */,
+				C30700000000000000000003 /* SystemProxyOperationPolicy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1106,6 +1111,7 @@
 				4929F67F258CE04700A435F6 /* Settings.swift in Sources */,
 				C30500000000000000000002 /* ShortcutScope.swift in Sources */,
 				C30600000000000000000002 /* ManagedOperationSettlement.swift in Sources */,
+				C30700000000000000000002 /* SystemProxyOperationPolicy.swift in Sources */,
 				49D6A45629AEEC55006487EF /* StatusItemViewProtocol.swift in Sources */,
 				493AEAE3221AE3420016FE98 /* AppVersionUtil.swift in Sources */,
 				49CF3B2120CD7463001EBF94 /* AppDelegate.swift in Sources */,
