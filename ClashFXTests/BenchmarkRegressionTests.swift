@@ -101,7 +101,7 @@ final class BenchmarkURLSettingsTests: XCTestCase {
     func testCustomHTTPSBenchmarkURLIsTrimmedAndPreserved() {
         XCTAssertEqual(
             BenchmarkURLSettings.normalizedURL(
-                "  https://www.gstatic.com/generate_204  ",
+                "  https://www.gstatic.com/generate_204  "
             ),
             "https://www.gstatic.com/generate_204"
         )
