@@ -277,7 +277,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func postFinishLaunching() {
         Logger.log("postFinishLaunching")
-        Settings.migrateLegacyBenchmarkURLIfNeeded()
+        Settings.restoreSupersededBenchmarkURLIfNeeded()
         defer {
             DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
                 self.checkMenuIconVisable()

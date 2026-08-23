@@ -78,37 +78,77 @@ final class DiagnosticFormattingTests: XCTestCase {
 }
 
 final class BenchmarkURLSettingsTests: XCTestCase {
-    func testValidBenchmarkURLIsTrimmedAndPreserved() {
+    func testCanonicalDefaultMatchesClashXCompatibleHTTPURL() {
+        XCTAssertEqual(BenchmarkURLSettings.defaultURL, "http://cp.cloudflare.com/generate_204")
+    }
+
+    func testWhitespaceOnlyBenchmarkURLRestoresCanonicalDefault() {
+        XCTAssertEqual(
+            BenchmarkURLSettings.normalizedURL("  \n\t  "),
+            BenchmarkURLSettings.defaultURL
+        )
+    }
+
+    func testExplicitHTTPBenchmarkURLIsTrimmedAndPreserved() {
+        XCTAssertEqual(
+            BenchmarkURLSettings.normalizedURL(
+                "  http://www.gstatic.com/generate_204  "
+            ),
+            "http://www.gstatic.com/generate_204"
+        )
+    }
+
+    func testCustomHTTPSBenchmarkURLIsTrimmedAndPreserved() {
         XCTAssertEqual(
             BenchmarkURLSettings.normalizedURL(
                 "  https://www.gstatic.com/generate_204  ",
-                defaultURL: "https://cp.cloudflare.com/generate_204"
             ),
             "https://www.gstatic.com/generate_204"
         )
     }
 
-    func testEmptyBenchmarkURLRestoresDefault() {
-        XCTAssertEqual(
-            BenchmarkURLSettings.normalizedURL(
-                "  ",
-                defaultURL: "https://cp.cloudflare.com/generate_204"
-            ),
-            "https://cp.cloudflare.com/generate_204"
+    func testSupersededBuiltInHTTPSDefaultRestoresBeforeCompletion() {
+        XCTAssertTrue(
+            BenchmarkURLSettings.shouldRestoreSupersededBuiltInDefault(
+                savedURL: BenchmarkURLSettings.supersededBuiltInDefaultURL,
+                restorationCompleted: false
+            )
+        )
+    }
+
+    func testCustomURLsDoNotRequestRestoration() {
+        XCTAssertFalse(
+            BenchmarkURLSettings.shouldRestoreSupersededBuiltInDefault(
+                savedURL: "http://www.gstatic.com/generate_204",
+                restorationCompleted: false
+            )
+        )
+        XCTAssertFalse(
+            BenchmarkURLSettings.shouldRestoreSupersededBuiltInDefault(
+                savedURL: "https://custom.example.test/generate_204",
+                restorationCompleted: false
+            )
+        )
+    }
+
+    func testCompletedRestorationPreservesLaterHTTPSCloudflareSelection() {
+        XCTAssertFalse(
+            BenchmarkURLSettings.shouldRestoreSupersededBuiltInDefault(
+                savedURL: BenchmarkURLSettings.supersededBuiltInDefaultURL,
+                restorationCompleted: true
+            )
         )
     }
 
     func testInvalidBenchmarkURLDoesNotReplaceSavedValue() {
         XCTAssertNil(
             BenchmarkURLSettings.normalizedURL(
-                "gstatic.com/generate_204",
-                defaultURL: "https://cp.cloudflare.com/generate_204"
+                "gstatic.com/generate_204"
             )
         )
         XCTAssertNil(
             BenchmarkURLSettings.normalizedURL(
-                "file:///tmp/generate_204",
-                defaultURL: "https://cp.cloudflare.com/generate_204"
+                "file:///tmp/generate_204"
             )
         )
     }
