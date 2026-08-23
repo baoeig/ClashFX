@@ -1,5 +1,19 @@
 ### Bug Fixes
 
+- **Manual Benchmark Default Matches ClashX Again** — The default is again the ClashX-compatible `http://cp.cloudflare.com/generate_204`. Only the superseded built-in `https://cp.cloudflare.com/generate_204` value is corrected once; custom HTTP/HTTPS URLs remain unchanged, and a later explicit HTTPS choice stays valid. An isolated comparison produced green HTTP results while HTTPS produced none. (#147)
+
+---
+
+### 修复
+
+- **手动测速默认地址再次与 ClashX 保持一致** — 默认地址已恢复为与 ClashX 兼容的 `http://cp.cloudflare.com/generate_204`。只会一次性修正已被替代的内置 `https://cp.cloudflare.com/generate_204` 值；自定义 HTTP/HTTPS 地址保持不变，之后用户明确选择 HTTPS 仍然有效。隔离对比中 HTTP 测速出现绿色结果，而 HTTPS 没有。 (#147)
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **System Proxy Settings Restore Exactly After Disable or Quit** — Before taking over, ClashFX now captures each existing network service's complete HTTP, HTTPS, SOCKS, PAC, exception, and partially enabled proxy state. Turning System Proxy off or quitting restores that exact state once; services created later stay untouched, and Helper failures are reported instead of being treated as success. (#147)
 - **Managed Configuration Updates Always Settle** — Remote subscription updates now have bounded cancellation and one serialized completion path. A failed or stalled request can no longer leave the configuration row stuck at “Updating,” and late callbacks cannot overwrite a newer result. (#147)
 - **Benchmark Paths and Automatic Results Are Release-Verified** — Selector benchmarks retain ordered visible rows while sharing equivalent path measurements; nested rows show the fresh selected leaf and result without re-evaluating automatic policy. Explicit automatic retests use the group's own settings and display Mihomo's fresh final path/result, while failures and cancellation settle without stale UI or repeated terminal refreshes. Automatic groups are not forced to choose the smallest displayed latency. (#147)
