@@ -1,24 +1,24 @@
 ### Bug Fixes
 
-- **Manual Delay Results Stay With the Correct Strategy Row** — Selector benchmarks now keep each settled result tied to its strategy row, resolved leaf, test URL, and benchmark session. Later provider health checks can no longer overwrite the displayed result, and automatic groups show history from their own effective test URL. (#147)
-- **Shortcuts No Longer Interfere With Other Apps by Default** — Action shortcuts now work only while the ClashFX menu is open unless global shortcuts are explicitly enabled in Settings. “Open Menu” remains global, and global action handlers pause while the menu is open to prevent duplicate or delayed actions. (#209)
+- **System Proxy Settings Restore Exactly After Disable or Quit** — Before taking over, ClashFX now captures each existing network service's complete HTTP, HTTPS, SOCKS, PAC, exception, and partially enabled proxy state. Turning System Proxy off or quitting restores that exact state once; services created later stay untouched, and Helper failures are reported instead of being treated as success. (#147)
+- **Managed Configuration Updates Always Settle** — Remote subscription updates now have bounded cancellation and one serialized completion path. A failed or stalled request can no longer leave the configuration row stuck at “Updating,” and late callbacks cannot overwrite a newer result. (#147)
+- **Benchmark Paths and Automatic Results Are Release-Verified** — Selector benchmarks retain ordered visible rows while sharing equivalent path measurements; nested rows show the fresh selected leaf and result without re-evaluating automatic policy. Explicit automatic retests use the group's own settings and display Mihomo's fresh final path/result, while failures and cancellation settle without stale UI or repeated terminal refreshes. Automatic groups are not forced to choose the smallest displayed latency. (#147)
 
 ### Contributors
 
-- @a51095 — Reported strategy rows showing stale or misleading delay results after manual benchmarks. (#147)
-- @AndDevMK — Reported that ClashFX shortcuts could conflict with standard shortcuts in other macOS applications and suggested configurable scope. (#209)
+- @a51095 — Reported the proxy restoration, managed-update, and benchmark-result issues and verified the six release acceptance flows. (#147)
 
 ---
 
 ### 修复
 
-- **手动测速结果会保持在正确的策略行** — Selector 测速结果现在会绑定到对应策略行、最终节点、测速地址和本次测速会话；后续 Provider 健康检查不会再覆盖界面结果，自动策略组也会按自身实际测速地址显示历史。 (#147)
-- **快捷键默认不再干扰其他应用** — 动作快捷键默认仅在 ClashFX 菜单打开时生效；如需在其他应用中使用，可在设置中明确启用全局快捷键。“打开菜单”始终保持全局，菜单打开期间会暂停全局动作监听，避免重复或延迟执行。 (#209)
+- **关闭系统代理或退出后会精确恢复原设置** — ClashFX 接管前会保存每个现有网络服务完整的 HTTP、HTTPS、SOCKS、PAC、例外列表及部分启用状态。取消系统代理或正常退出时只恢复一次原始状态；之后新建的网络服务不会被改动，Helper 执行失败也会明确返回，而不再被误判为成功。 (#147)
+- **托管配置更新一定会结束** — 远程订阅更新现在使用有界取消和串行的单次完成路径。请求失败或超时不会再让配置行一直停在“更新中”，延迟返回的旧回调也不会覆盖较新的结果。 (#147)
+- **测速路径与自动策略最终结果已完成发布验证** — Selector 会保留可见行顺序，同时复用相同路径的测速结果；嵌套行显示最新选中节点及结果，不会重新触发自动策略判断。明确点击自动策略重测时会使用该策略自己的设置，并显示 Mihomo 最新的最终路径与结果；失败和取消也会结束干净，不留下旧界面状态或重复刷新。自动策略不会被 ClashFX 强制选择界面上数字最小的节点。 (#147)
 
 ### 贡献者
 
-- @a51095 — 反馈手动测速后策略行可能显示过期或不准确的延迟结果。 (#147)
-- @AndDevMK — 反馈 ClashFX 快捷键可能与其他 macOS 应用的标准快捷键冲突，并建议提供可配置的作用范围。 (#209)
+- @a51095 — 反馈系统代理恢复、托管配置更新及测速结果问题，并完成本次发布的六项人工验收。 (#147)
 
 <!-- Previous release notes -->
 
