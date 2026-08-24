@@ -1,11 +1,13 @@
 ### Bug Fixes
 
+- **Large Selector Benchmarks Adapt to Current Conditions** — Selector tests now begin with eight requests, grow through twelve to a maximum of sixteen after healthy current-run results, and fall back toward four when failures cluster. On the supplied 49-target configuration, two isolated adaptive runs completed in 7.4–9.0 seconds with 37 successes, versus about 25–26 seconds and 35–36 successes at fixed concurrency four. A Clash Party-style 50-request burst was faster but reduced the number of sub-300 ms results from roughly 9–11 to 1. Test URLs, timeouts, returned delays, and color thresholds are unchanged. (#147)
 - **Manual Benchmark Default Matches ClashX Again** — The default is again the ClashX-compatible `http://cp.cloudflare.com/generate_204`. Only the superseded built-in `https://cp.cloudflare.com/generate_204` value is corrected once; custom HTTP/HTTPS URLs remain unchanged, and a later explicit HTTPS choice stays valid. An isolated comparison produced green HTTP results while HTTPS produced none. (#147)
 
 ---
 
 ### 修复
 
+- **大型 Selector 测速会根据当前结果自动调整并发** — Selector 测速现在从 8 个请求开始，当前轮结果健康时依次提高到 12、最高 16；集中失败时则逐步回退到 4。使用用户提供的 49 个目标进行隔离对照时，两次自适应测速分别用时 7.4～9.0 秒并成功 37 个；固定并发 4 则约需 25～26 秒、成功 35～36 个。类似 Clash Party 的 50 并发虽然更快，但会让低于 300ms 的结果从约 9～11 个降到 1 个。测速地址、超时、核心返回延迟和颜色阈值均未改变。 (#147)
 - **手动测速默认地址再次与 ClashX 保持一致** — 默认地址已恢复为与 ClashX 兼容的 `http://cp.cloudflare.com/generate_204`。只会一次性修正已被替代的内置 `https://cp.cloudflare.com/generate_204` 值；自定义 HTTP/HTTPS 地址保持不变，之后用户明确选择 HTTPS 仍然有效。隔离对比中 HTTP 测速出现绿色结果，而 HTTPS 没有。 (#147)
 
 <!-- Previous release notes -->
