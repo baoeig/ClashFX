@@ -540,7 +540,7 @@ final class BenchmarkRegressionTests: XCTestCase {
         XCTAssertEqual(plan.targets[0].key.timeout, 5)
     }
 
-    func testSelectorConcurrencyStaysConservativeForLargeMenus() throws {
+    func testSelectorConcurrencyStartsBoundedForLargeMenus() throws {
         let names = (1 ... 25).map { "Proxy \($0)" }
         var proxies: [[String: Any]] = [
             ["name": "Selector", "type": "Selector", "all": names, "now": names[0], "history": []]
@@ -557,7 +557,92 @@ final class BenchmarkRegressionTests: XCTestCase {
         )
 
         XCTAssertEqual(plan.targets.count, 25)
-        XCTAssertEqual(plan.maxConcurrentRequests, 4)
+        XCTAssertEqual(plan.maxConcurrentRequests, 8)
+        XCTAssertEqual(plan.concurrencyPolicy.minimumLimit, 4)
+        XCTAssertEqual(plan.concurrencyPolicy.maximumLimit, 16)
+    }
+
+    func testSelectorConcurrencyRampsFromEightToSixteenAfterHealthyWindows() {
+        var policy = SelectorBenchmarkConcurrencyPolicy(targetCount: 49)
+        XCTAssertEqual(policy.currentLimit, 8)
+
+        for _ in 0 ..< 8 {
+            policy.recordCompletion(succeeded: true)
+        }
+        XCTAssertEqual(policy.currentLimit, 12)
+
+        for _ in 0 ..< 6 {
+            policy.recordCompletion(succeeded: true)
+        }
+        for _ in 0 ..< 2 {
+            policy.recordCompletion(succeeded: false)
+        }
+        XCTAssertEqual(policy.currentLimit, 16)
+
+        for _ in 0 ..< 8 {
+            policy.recordCompletion(succeeded: true)
+        }
+        XCTAssertEqual(policy.currentLimit, 16)
+    }
+
+    func testSelectorConcurrencyHoldsForMixedWindowAndBacksOffOnClusteredFailures() {
+        var policy = SelectorBenchmarkConcurrencyPolicy(targetCount: 49)
+
+        for _ in 0 ..< 5 {
+            policy.recordCompletion(succeeded: true)
+        }
+        for _ in 0 ..< 3 {
+            policy.recordCompletion(succeeded: false)
+        }
+        XCTAssertEqual(policy.currentLimit, 8)
+
+        for _ in 0 ..< 4 {
+            policy.recordCompletion(succeeded: true)
+            policy.recordCompletion(succeeded: false)
+        }
+        XCTAssertEqual(policy.currentLimit, 4)
+
+        for _ in 0 ..< 8 {
+            policy.recordCompletion(succeeded: false)
+        }
+        XCTAssertEqual(policy.currentLimit, 4)
+    }
+
+    func testSelectorConcurrencyNeverExceedsSmallPlanSize() {
+        var policy = SelectorBenchmarkConcurrencyPolicy(targetCount: 3)
+        XCTAssertEqual(policy.minimumLimit, 3)
+        XCTAssertEqual(policy.currentLimit, 3)
+        XCTAssertEqual(policy.maximumLimit, 3)
+
+        for _ in 0 ..< 8 {
+            policy.recordCompletion(succeeded: true)
+        }
+        XCTAssertEqual(policy.currentLimit, 3)
+    }
+
+    func testAdaptiveRunnerAppliesPolicyLimitChanges() {
+        let completion = expectation(description: "adaptive runner completes")
+        var limitChanges = [(Int, Int)]()
+        let tasks: [AdaptiveAsyncTaskRunner.Task] = (0 ..< 49).map { _ in
+            return { done in
+                done(true)
+            }
+        }
+        let runner = AdaptiveAsyncTaskRunner(
+            tasks: tasks,
+            policy: SelectorBenchmarkConcurrencyPolicy(targetCount: tasks.count),
+            limitChanged: { previousLimit, currentLimit in
+                limitChanges.append((previousLimit, currentLimit))
+            }
+        )
+
+        runner.start {
+            completion.fulfill()
+        }
+        wait(for: [completion], timeout: 2)
+
+        XCTAssertEqual(limitChanges.map(\.0), [8, 12])
+        XCTAssertEqual(limitChanges.map(\.1), [12, 16])
     }
 
     func testProxyHistoryIsScopedToExactBenchmarkURL() throws {

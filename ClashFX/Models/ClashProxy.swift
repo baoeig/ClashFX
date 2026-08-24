@@ -239,11 +239,110 @@ struct SelectorBenchmarkRow {
     let unavailableReason: SelectorBenchmarkUnavailableReason?
 }
 
-struct SelectorBenchmarkPlan {
-    private static let smallPlanConcurrency = 6
-    private static let largePlanConcurrency = 4
-    private static let largePlanThreshold = 24
+struct SelectorBenchmarkConcurrencyPolicy {
+    private static let minimumConcurrency = 4
+    private static let initialConcurrency = 8
+    private static let maximumConcurrency = 16
+    private static let evaluationWindowSize = 8
+    private static let healthyWindowMaximumFailures = 2
+    private static let clusteredFailureMinimum = 4
+    private static let adjustmentStep = 4
 
+    private let targetCount: Int
+    private var windowCompletionCount = 0
+    private var windowFailureCount = 0
+
+    private(set) var currentLimit: Int
+
+    var minimumLimit: Int {
+        return max(1, min(targetCount, Self.minimumConcurrency))
+    }
+
+    var maximumLimit: Int {
+        return max(1, min(targetCount, Self.maximumConcurrency))
+    }
+
+    init(targetCount: Int) {
+        let normalizedTargetCount = max(0, targetCount)
+        self.targetCount = normalizedTargetCount
+        currentLimit = max(1, min(normalizedTargetCount, Self.initialConcurrency))
+    }
+
+    mutating func recordCompletion(succeeded: Bool) {
+        guard targetCount > 0 else { return }
+        windowCompletionCount += 1
+        if !succeeded {
+            windowFailureCount += 1
+        }
+
+        guard windowCompletionCount >= Self.evaluationWindowSize else { return }
+
+        if windowFailureCount <= Self.healthyWindowMaximumFailures {
+            currentLimit = min(maximumLimit, currentLimit + Self.adjustmentStep)
+        } else if windowFailureCount >= Self.clusteredFailureMinimum {
+            currentLimit = max(minimumLimit, currentLimit - Self.adjustmentStep)
+        }
+
+        windowCompletionCount = 0
+        windowFailureCount = 0
+    }
+}
+
+final class AdaptiveAsyncTaskRunner {
+    typealias Task = (@escaping (Bool) -> Void) -> Void
+
+    private let tasks: [Task]
+    private let stateQueue = DispatchQueue(label: "com.clashfx.adaptiveProxyDelayTaskRunner")
+    private let limitChanged: ((Int, Int) -> Void)?
+    private var policy: SelectorBenchmarkConcurrencyPolicy
+    private var nextTaskIndex = 0
+    private var activeTaskCount = 0
+    private var completion: (() -> Void)?
+
+    init(tasks: [Task],
+         policy: SelectorBenchmarkConcurrencyPolicy,
+         limitChanged: ((Int, Int) -> Void)? = nil) {
+        self.tasks = tasks
+        self.policy = policy
+        self.limitChanged = limitChanged
+    }
+
+    func start(completion: @escaping () -> Void) {
+        stateQueue.async {
+            self.completion = completion
+            self.scheduleAvailableTasks()
+        }
+    }
+
+    private func scheduleAvailableTasks() {
+        while activeTaskCount < policy.currentLimit, nextTaskIndex < tasks.count {
+            let task = tasks[nextTaskIndex]
+            nextTaskIndex += 1
+            activeTaskCount += 1
+
+            task { succeeded in
+                self.stateQueue.async {
+                    self.activeTaskCount -= 1
+                    let previousLimit = self.policy.currentLimit
+                    self.policy.recordCompletion(succeeded: succeeded)
+                    if self.policy.currentLimit != previousLimit {
+                        self.limitChanged?(previousLimit, self.policy.currentLimit)
+                    }
+                    self.scheduleAvailableTasks()
+                }
+            }
+        }
+
+        guard nextTaskIndex == tasks.count, activeTaskCount == 0 else { return }
+        let completion = completion
+        self.completion = nil
+        DispatchQueue.main.async {
+            completion?()
+        }
+    }
+}
+
+struct SelectorBenchmarkPlan {
     struct Target {
         let key: SelectorBenchmarkMeasurementKey
         let aliases: [SelectorBenchmarkRow]
@@ -252,15 +351,14 @@ struct SelectorBenchmarkPlan {
     let orderedRows: [SelectorBenchmarkRow]
     let targets: [Target]
 
-    /// Large menus can otherwise saturate the benchmark destination or the
-    /// local connection pool and inflate every measured delay. Small plans
-    /// keep a little more parallelism so their total completion time stays low.
+    var concurrencyPolicy: SelectorBenchmarkConcurrencyPolicy {
+        return SelectorBenchmarkConcurrencyPolicy(targetCount: targets.count)
+    }
+
+    /// The initial limit remains available to diagnostics and regression tests;
+    /// Selector execution can raise or lower it using current-session results.
     var maxConcurrentRequests: Int {
-        guard !targets.isEmpty else { return 1 }
-        let limit = targets.count > Self.largePlanThreshold
-            ? Self.largePlanConcurrency
-            : Self.smallPlanConcurrency
-        return min(targets.count, limit)
+        return concurrencyPolicy.currentLimit
     }
 
     static func make(selector: ClashProxy,

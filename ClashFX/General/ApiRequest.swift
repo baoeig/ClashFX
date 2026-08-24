@@ -968,11 +968,11 @@ class ApiRequest {
             return
         }
 
-        typealias DelayTask = LimitedAsyncTaskRunner.Task
+        typealias DelayTask = AdaptiveAsyncTaskRunner.Task
         let tasks: [DelayTask] = plan.targets.map { target in
             return { done in
                 guard !session.isCancelled else {
-                    done()
+                    done(false)
                     return
                 }
                 switch target.key.endpoint {
@@ -986,7 +986,7 @@ class ApiRequest {
                         if !session.isCancelled {
                             result(target, delay)
                         }
-                        done()
+                        done(delay > 0)
                     }
                 case .provider:
                     guard let providerName = target.key.providerName else {
@@ -994,7 +994,7 @@ class ApiRequest {
                             "[Proxy Delay] Selector provider target '\(target.key.proxyName)' has no provider name",
                             level: .error
                         )
-                        done()
+                        done(false)
                         return
                     }
                     getProviderProxyDelay(
@@ -1007,18 +1007,30 @@ class ApiRequest {
                         if !session.isCancelled {
                             result(target, delay)
                         }
-                        done()
+                        done(delay > 0)
                     }
                 }
             }
         }
 
+        let concurrencyPolicy = plan.concurrencyPolicy
+
         Logger.log(
             "[Proxy Delay] Starting Selector benchmark: \(tasks.count) unique target(s), "
-                + "max concurrency \(plan.maxConcurrentRequests)"
+                + "initial concurrency \(concurrencyPolicy.currentLimit), "
+                + "max concurrency \(concurrencyPolicy.maximumLimit)"
         )
-        LimitedAsyncTaskRunner(tasks: tasks, maxConcurrent: plan.maxConcurrentRequests)
-            .start(completion: completion)
+        AdaptiveAsyncTaskRunner(
+            tasks: tasks,
+            policy: concurrencyPolicy,
+            limitChanged: { previousLimit, currentLimit in
+                Logger.log(
+                    "[Proxy Delay] Adaptive Selector concurrency changed "
+                        + "from \(previousLimit) to \(currentLimit)"
+                )
+            }
+        )
+        .start(completion: completion)
     }
 
     private static func benchmarkRequestTimeout(for coreTimeoutMilliseconds: Int) -> TimeInterval {
