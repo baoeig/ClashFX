@@ -1,3 +1,4 @@
+import Cocoa
 import XCTest
 
 final class ShortcutScopePolicyTests: XCTestCase {
@@ -1068,6 +1069,74 @@ final class ProxyMenuRefreshPolicyTests: XCTestCase {
             Set(["Leaf", "Automatic", "Selector"])
         )
         XCTAssertTrue(ProxyMenuSnapshotDelta.affectedNames(previous: current, current: current).isEmpty)
+    }
+}
+
+final class SubscriptionStatusPresentationTests: XCTestCase {
+    private func renderedWidth(_ text: String, font: NSFont) -> CGFloat {
+        return (text as NSString).size(withAttributes: [.font: font]).width
+    }
+
+    func testShortStatusTextIsPreserved() {
+        let font = NSFont.menuFont(ofSize: 0)
+        XCTAssertEqual(
+            SubscriptionInfoFormatter.truncatedMenuText("My Subscription", font: font),
+            "My Subscription"
+        )
+    }
+
+    func testLongASCIIChineseAndEmojiTextFitsStatusLineWidth() {
+        let font = NSFont.menuFont(ofSize: 0)
+        let samples = [
+            String(repeating: "subscription-name-", count: 12),
+            String(repeating: "这是一个非常长的订阅名称", count: 12),
+            String(repeating: "全球节点🚀🌏", count: 16),
+        ]
+
+        for sample in samples {
+            let result = SubscriptionInfoFormatter.truncatedMenuText(sample, font: font)
+            XCTAssertTrue(result.hasSuffix("…"), result)
+            XCTAssertLessThanOrEqual(
+                renderedWidth(result, font: font),
+                SubscriptionInfoFormatter.maximumStatusLineWidth + 0.5
+            )
+        }
+    }
+
+    func testStatusRowBoundsBothLinesAndTooltipKeepsFullText() {
+        let name = String(repeating: "Very Long Subscription Name ", count: 10)
+        let summary = String(repeating: "123.45 GB / 999.99 GB used · 365 days left ", count: 8)
+        let title = SubscriptionInfoFormatter.statusRowAttributedTitle(name: name, summary: summary)
+        let lines = title.string.components(separatedBy: "\n")
+
+        XCTAssertEqual(lines.count, 2)
+        XCTAssertLessThanOrEqual(
+            renderedWidth(lines[0], font: NSFont.menuFont(ofSize: 0)),
+            SubscriptionInfoFormatter.maximumStatusLineWidth + 0.5
+        )
+        XCTAssertLessThanOrEqual(
+            renderedWidth(lines[1], font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)),
+            SubscriptionInfoFormatter.maximumStatusLineWidth + 0.5
+        )
+        XCTAssertEqual(
+            SubscriptionInfoFormatter.statusRowTooltip(name: name, summary: summary),
+            "\(name.trimmingCharacters(in: .whitespacesAndNewlines))\n\(summary)"
+        )
+    }
+
+    func testSubscriptionVisibilityPreferenceDefaultsOnAndPersistsOff() throws {
+        let suiteName = "SubscriptionStatusPresentationTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var preference = UserDefault(
+            "trayMenuShowSubscriptionInfo",
+            defaultValue: true,
+            userDefaults: defaults
+        )
+        XCTAssertTrue(preference.wrappedValue)
+        preference.wrappedValue = false
+        XCTAssertFalse(preference.wrappedValue)
     }
 }
 

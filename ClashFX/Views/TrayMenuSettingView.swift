@@ -48,6 +48,11 @@ class TrayMenuSettingView: NSView {
     private func sections() -> [SectionEntry] {
         return [
             .single(ItemRow(
+                title: NSLocalizedString("Show Subscription Information", comment: ""),
+                getter: { Settings.trayMenuShowSubscriptionInfo },
+                setter: { Settings.trayMenuShowSubscriptionInfo = $0 }
+            )),
+            .single(ItemRow(
                 title: NSLocalizedString("Proxy Mode", comment: ""),
                 getter: { Settings.trayMenuShowProxyMode },
                 setter: { Settings.trayMenuShowProxyMode = $0 }

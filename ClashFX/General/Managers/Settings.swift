@@ -288,6 +288,9 @@ enum Settings {
 
     // MARK: - Tray Menu Visibility
 
+    @UserDefault("trayMenuShowSubscriptionInfo", defaultValue: true)
+    static var trayMenuShowSubscriptionInfo: Bool
+
     @UserDefault("trayMenuShowProxyMode", defaultValue: true)
     static var trayMenuShowProxyMode: Bool
 

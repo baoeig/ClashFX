@@ -26,6 +26,9 @@
 		C30800000000000000000002 /* ProxySettingRestorationPolicyTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C30800000000000000000001 /* ProxySettingRestorationPolicyTests.m */; };
 		C30800000000000000000004 /* ProxySettingRestorationPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = C30800000000000000000003 /* ProxySettingRestorationPolicy.m */; };
 		C30800000000000000000005 /* ProxySettingRestorationPolicy.m in Sources */ = {isa = PBXBuildFile; fileRef = C30800000000000000000003 /* ProxySettingRestorationPolicy.m */; };
+		C30900000000000000000001 /* SubscriptionInfoFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F00002270000000000C027 /* SubscriptionInfoFormatter.swift */; };
+		C30900000000000000000002 /* RemoteConfigModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499A485722ED715200F6C675 /* RemoteConfigModel.swift */; };
+		C30900000000000000000003 /* UserDefaultWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4929F683258CE07500A435F6 /* UserDefaultWrapper.swift */; };
 		03B729DE29C62F46117B82A2 /* LabSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6174820C53D16D319C2DB8E /* LabSupport.swift */; };
 		079C0498F443DE06CFD1A2E0 /* FormHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1541315BE9AC1A5200C8FDA /* FormHelpers.swift */; };
 		0AD7506B2A5B9A04001FFBBD /* ConnectionLeftPannelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD7506A2A5B9A04001FFBBD /* ConnectionLeftPannelViewModel.swift */; };
@@ -1091,6 +1094,9 @@
 				C30700000000000000000003 /* SystemProxyOperationPolicy.swift in Sources */,
 				C30800000000000000000002 /* ProxySettingRestorationPolicyTests.m in Sources */,
 				C30800000000000000000004 /* ProxySettingRestorationPolicy.m in Sources */,
+				C30900000000000000000001 /* SubscriptionInfoFormatter.swift in Sources */,
+				C30900000000000000000002 /* RemoteConfigModel.swift in Sources */,
+				C30900000000000000000003 /* UserDefaultWrapper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

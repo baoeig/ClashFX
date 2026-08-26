@@ -8,10 +8,15 @@
 import Cocoa
 
 enum SubscriptionInfoFormatter {
-    private static let maximumMenuSummaryCharacters = 64
+    static let maximumStatusLineWidth: CGFloat = 320
 
     static func menuSubtitle(for info: SubscriptionInfo) -> String? {
-        fullMenuSubtitle(for: info).map(truncatedMenuSummary)
+        return fullMenuSubtitle(for: info).map {
+            truncatedMenuText(
+                $0,
+                font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
+            )
+        }
     }
 
     static func fullMenuSubtitle(for info: SubscriptionInfo) -> String? {
@@ -46,25 +51,68 @@ enum SubscriptionInfoFormatter {
 
     static func statusRowAttributedTitle(name: String, summary: String) -> NSAttributedString {
         let displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let nameLine = displayName.isEmpty
+        let fullNameLine = displayName.isEmpty
             ? NSLocalizedString("Subscription", comment: "subscription status row fallback name")
             : displayName
+        let nameFont = NSFont.menuFont(ofSize: 0)
+        let summaryFont = NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)
+        let nameLine = truncatedMenuText(fullNameLine, font: nameFont)
+        let summaryLine = truncatedMenuText(summary, font: summaryFont)
 
         let nameParagraph = NSMutableParagraphStyle()
         nameParagraph.paragraphSpacing = 2
         let nameAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.menuFont(ofSize: 0),
+            .font: nameFont,
             .paragraphStyle: nameParagraph
         ]
         let summaryAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
+            .font: summaryFont,
             .foregroundColor: NSColor.secondaryLabelColor
         ]
 
         let result = NSMutableAttributedString(string: nameLine, attributes: nameAttrs)
         result.append(NSAttributedString(string: "\n", attributes: nameAttrs))
-        result.append(NSAttributedString(string: summary, attributes: summaryAttrs))
+        result.append(NSAttributedString(string: summaryLine, attributes: summaryAttrs))
         return result
+    }
+
+    static func statusRowTooltip(name: String, summary: String) -> String {
+        let displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nameLine = displayName.isEmpty
+            ? NSLocalizedString("Subscription", comment: "subscription status row fallback name")
+            : displayName
+        return "\(nameLine)\n\(summary)"
+    }
+
+    static func truncatedMenuText(
+        _ text: String,
+        font: NSFont,
+        maximumWidth: CGFloat = maximumStatusLineWidth
+    ) -> String {
+        guard maximumWidth > 0 else { return "" }
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        let width: (String) -> CGFloat = {
+            return ($0 as NSString).size(withAttributes: attributes).width
+        }
+        guard width(text) > maximumWidth else { return text }
+
+        let ellipsis = "…"
+        guard width(ellipsis) <= maximumWidth else { return "" }
+
+        let characters = Array(text)
+        var lowerBound = 0
+        var upperBound = characters.count
+        while lowerBound < upperBound {
+            let candidateCount = (lowerBound + upperBound + 1) / 2
+            let candidate = String(characters.prefix(candidateCount)) + ellipsis
+            if width(candidate) <= maximumWidth {
+                lowerBound = candidateCount
+            } else {
+                upperBound = candidateCount - 1
+            }
+        }
+        return String(characters.prefix(lowerBound))
+            .trimmingCharacters(in: .whitespacesAndNewlines) + ellipsis
     }
 
     private static func trafficSummary(for info: SubscriptionInfo) -> String? {
@@ -113,10 +161,5 @@ enum SubscriptionInfoFormatter {
         formatter.includesUnit = true
         formatter.zeroPadsFractionDigits = false
         return formatter.string(fromByteCount: bytes)
-    }
-
-    private static func truncatedMenuSummary(_ summary: String) -> String {
-        guard summary.count > maximumMenuSummaryCharacters else { return summary }
-        return String(summary.prefix(maximumMenuSummaryCharacters)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 }

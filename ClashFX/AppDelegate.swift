@@ -521,6 +521,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func refreshSubscriptionStatusMenuItem() {
         guard let item = subscriptionStatusMenuItem,
               let separator = subscriptionStatusSeparator else { return }
+        guard Settings.trayMenuShowSubscriptionInfo else {
+            hideSubscriptionStatusMenuItem(item: item, separator: separator)
+            return
+        }
 
         let activeName = ConfigManager.selectConfigName
         let activeRemote = RemoteConfigManager.shared.configs.first { $0.name == activeName }
@@ -529,11 +533,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let info,
               let summary = SubscriptionInfoFormatter.menuSubtitle(for: info),
               let fullSummary = SubscriptionInfoFormatter.fullMenuSubtitle(for: info) else {
-            item.attributedTitle = NSAttributedString(string: "")
-            item.title = ""
-            item.toolTip = nil
-            item.isHidden = true
-            separator.isHidden = true
+            hideSubscriptionStatusMenuItem(item: item, separator: separator)
             refreshLocalProxyProviderSubscriptionStatus(configName: activeName)
             return
         }
@@ -542,9 +542,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: activeName,
             summary: summary
         )
-        item.toolTip = fullSummary
+        item.toolTip = SubscriptionInfoFormatter.statusRowTooltip(
+            name: activeName,
+            summary: fullSummary
+        )
         item.isHidden = false
         separator.isHidden = false
+    }
+
+    private func hideSubscriptionStatusMenuItem(item: NSMenuItem, separator: NSMenuItem) {
+        item.attributedTitle = NSAttributedString(string: "")
+        item.title = ""
+        item.toolTip = nil
+        item.isHidden = true
+        separator.isHidden = true
     }
 
     private func refreshLocalProxyProviderSubscriptionStatus(configName: String) {
@@ -4344,6 +4355,7 @@ extension AppDelegate {
 extension AppDelegate {
     @objc func onTrayMenuSettingsChanged() {
         applyTrayMenuVisibility()
+        refreshSubscriptionStatusMenuItem()
     }
 
     /// Hides or shows dynamic config-switch items and the separator that follows them.
