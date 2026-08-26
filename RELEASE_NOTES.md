@@ -1,5 +1,21 @@
 ### Bug Fixes
 
+- **Selector Benchmarks Avoid Ordered Connection Bursts** — Visible rows keep their subscription order, while background requests are interleaved across protocol/provider cohorts and concurrency changes wait for each cohort to finish. First-pass failures receive one conservative retry before a single final result is shown, reducing transient bulk failures without flashing stale states. (#147)
+- **The Selected Automatic Group Re-evaluates After Leaf Tests** — When a Selector currently uses an automatic group, that row stays in testing until the leaf pass completes. ClashFX then retests that group once with its configured settings and displays Mihomo's fresh final `now` path; other automatic rows remain measurement-only, and ClashFX never substitutes its own lowest-latency choice. (#147)
+
+---
+
+### 修复
+
+- **Selector 测速会避免按订阅顺序集中冲击同类连接** — 菜单中的节点顺序保持不变，后台请求则按协议和 Provider 分组交错执行，并在当前批次全部完成后才调整并发。首轮失败项只会再进行一次保守低并发复测，界面最终只发布一次结果，从而减少瞬时大面积失败和状态闪烁。 (#147)
+- **当前选中的自动策略会在节点测速后重新判断** — 当 Selector 正在使用自动策略组时，该行会保持“测速中”，直到节点测速完成；随后 ClashFX 使用该组自己的设置重测一次，并显示 Mihomo 最新的 `now` 最终路径。其他自动策略行仍只做测量，ClashFX 不会自行用最低延迟替代核心选择。 (#147)
+
+<!-- Previous release notes -->
+
+---
+
+### Bug Fixes
+
 - **Large Selector Benchmarks Adapt to Current Conditions** — Selector tests now begin with eight requests, grow through twelve to a maximum of sixteen after healthy current-run results, and fall back toward four when failures cluster. On the supplied 49-target configuration, two isolated adaptive runs completed in 7.4–9.0 seconds with 37 successes, versus about 25–26 seconds and 35–36 successes at fixed concurrency four. A Clash Party-style 50-request burst was faster but reduced the number of sub-300 ms results from roughly 9–11 to 1. Test URLs, timeouts, returned delays, and color thresholds are unchanged. (#147)
 - **Manual Benchmark Default Matches ClashX Again** — The default is again the ClashX-compatible `http://cp.cloudflare.com/generate_204`. Only the superseded built-in `https://cp.cloudflare.com/generate_204` value is corrected once; custom HTTP/HTTPS URLs remain unchanged, and a later explicit HTTPS choice stays valid. An isolated comparison produced green HTTP results while HTTPS produced none. (#147)
 
