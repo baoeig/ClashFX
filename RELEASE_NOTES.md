@@ -1,5 +1,7 @@
 ### Bug Fixes
 
+- **Large Menus Stay Responsive While Opening or Switching Configurations** — Proxy snapshots are decoded away from the main thread, overlapping refreshes are coalesced, and nested proxy rows are created only when their submenu opens. This removes repeated full-menu construction from the critical path while preserving current selections and live delay updates. (#216)
+- **Subscription Information No Longer Widens the Entire Menu** — The top subscription row now bounds each line by rendered width and keeps the complete name and quota details in its tooltip. It remains enabled by default and can be hidden entirely from Settings → Appearance → Tray Menu → Show Subscription Information. (#215)
 - **Selector Benchmarks Avoid Ordered Connection Bursts** — Visible rows keep their subscription order, while background requests are interleaved across protocol/provider cohorts and concurrency changes wait for each cohort to finish. First-pass failures receive one conservative retry before a single final result is shown, reducing transient bulk failures without flashing stale states. (#147)
 - **The Selected Automatic Group Re-evaluates After Leaf Tests** — When a Selector currently uses an automatic group, that row stays in testing until the leaf pass completes. ClashFX then retests that group once with its configured settings and displays Mihomo's fresh final `now` path; other automatic rows remain measurement-only, and ClashFX never substitutes its own lowest-latency choice. (#147)
 
@@ -7,6 +9,8 @@
 
 ### 修复
 
+- **打开大菜单或切换配置时保持流畅** — 代理快照改为在主线程外解析，重叠刷新会自动合并，嵌套节点也只在对应子菜单真正展开时创建，从关键路径中移除了重复的完整菜单构建，同时保留当前选择和实时延迟更新。 (#216)
+- **订阅信息不再撑宽整个菜单** — 顶部订阅信息的每一行现在按实际显示宽度限制，完整订阅名称和流量信息仍可通过悬停提示查看。该信息默认显示，也可以在“设置 → 外观 → 菜单栏菜单 → 显示订阅信息”中完整关闭。 (#215)
 - **Selector 测速会避免按订阅顺序集中冲击同类连接** — 菜单中的节点顺序保持不变，后台请求则按协议和 Provider 分组交错执行，并在当前批次全部完成后才调整并发。首轮失败项只会再进行一次保守低并发复测，界面最终只发布一次结果，从而减少瞬时大面积失败和状态闪烁。 (#147)
 - **当前选中的自动策略会在节点测速后重新判断** — 当 Selector 正在使用自动策略组时，该行会保持“测速中”，直到节点测速完成；随后 ClashFX 使用该组自己的设置重测一次，并显示 Mihomo 最新的 `now` 最终路径。其他自动策略行仍只做测量，ClashFX 不会自行用最低延迟替代核心选择。 (#147)
 
