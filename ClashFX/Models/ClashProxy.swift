@@ -121,7 +121,10 @@ struct SelectorBenchmarkPresentation {
         with snapshot: ClashProxyResp,
         currentBenchmarkURL: String
     ) -> SelectorBenchmarkPresentation {
-        guard benchmarkURL == currentBenchmarkURL else {
+        let currentAutomaticBenchmarkURL = snapshot.proxiesMap[rowName]
+            .flatMap { $0.type.isAutoGroup ? $0.effectiveBenchmarkURL(fallback: currentBenchmarkURL) : nil }
+        guard benchmarkURL == currentBenchmarkURL
+            || benchmarkURL == currentAutomaticBenchmarkURL else {
             return unavailable()
         }
         guard let resolvedLeafName else {
@@ -366,6 +369,12 @@ struct SelectorBenchmarkRetryPolicy {
     }
 }
 
+struct SelectorBenchmarkAutomaticRetestTarget {
+    let groupName: ClashProxyName
+    let benchmarkURL: String
+    let expectedStatus: String?
+}
+
 struct SelectorBenchmarkPlan {
     struct Target {
         let key: SelectorBenchmarkMeasurementKey
@@ -375,6 +384,7 @@ struct SelectorBenchmarkPlan {
 
     let orderedRows: [SelectorBenchmarkRow]
     let targets: [Target]
+    let selectedAutomaticRetest: SelectorBenchmarkAutomaticRetestTarget?
 
     var interleavedTargets: [Target] {
         var bucketOrder = [SelectorBenchmarkSchedulingBucket]()
@@ -416,6 +426,13 @@ struct SelectorBenchmarkPlan {
                      benchmarkURL: String,
                      timeout: Int) -> SelectorBenchmarkPlan {
         let visibleNames = selector.all ?? []
+        let selectedAutomaticGroup: ClashProxy? = {
+            guard let selectedName = selector.now,
+                  let selected = snapshot.proxiesMap[selectedName],
+                  selected.type.isAutoGroup,
+                  visibleNames.contains(selectedName) else { return nil }
+            return selected
+        }()
         var orderedRows = [SelectorBenchmarkRow]()
         var aliases = [SelectorBenchmarkMeasurementKey: [SelectorBenchmarkRow]]()
         var schedulingBuckets = [SelectorBenchmarkMeasurementKey: SelectorBenchmarkSchedulingBucket]()
@@ -426,7 +443,8 @@ struct SelectorBenchmarkPlan {
                 visibleName: visibleName,
                 snapshot: snapshot,
                 benchmarkURL: benchmarkURL,
-                timeout: timeout
+                timeout: timeout,
+                deferAutomaticRetest: visibleName == selectedAutomaticGroup?.name
             )
             orderedRows.append(row)
             guard let key = row.measurementKey else { continue }
@@ -445,13 +463,35 @@ struct SelectorBenchmarkPlan {
                   let schedulingBucket = schedulingBuckets[key] else { return nil }
             return Target(key: key, schedulingBucket: schedulingBucket, aliases: rows)
         }
-        return SelectorBenchmarkPlan(orderedRows: orderedRows, targets: targets)
+        let selectedAutomaticRetest = selectedAutomaticGroup.map {
+            SelectorBenchmarkAutomaticRetestTarget(
+                groupName: $0.name,
+                benchmarkURL: $0.effectiveBenchmarkURL(fallback: benchmarkURL),
+                expectedStatus: $0.expectedStatus
+            )
+        }
+        return SelectorBenchmarkPlan(
+            orderedRows: orderedRows,
+            targets: targets,
+            selectedAutomaticRetest: selectedAutomaticRetest
+        )
     }
 
     private static func makeRow(visibleName: ClashProxyName,
                                 snapshot: ClashProxyResp,
                                 benchmarkURL: String,
-                                timeout: Int) -> SelectorBenchmarkRow {
+                                timeout: Int,
+                                deferAutomaticRetest: Bool) -> SelectorBenchmarkRow {
+        if deferAutomaticRetest {
+            return SelectorBenchmarkRow(
+                rowName: visibleName,
+                displayName: visibleName,
+                measurementKey: nil,
+                schedulingBucket: nil,
+                isDeferredAutomaticRetest: true,
+                unavailableReason: nil
+            )
+        }
         switch snapshot.resolveSelectedPath(from: visibleName) {
         case let .resolved(_, proxy):
             let endpoint: SelectorBenchmarkEndpoint

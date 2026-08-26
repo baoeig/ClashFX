@@ -274,6 +274,23 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                 )
             )
         }
+        let publishAutomaticState: (
+            SelectorBenchmarkRow,
+            SelectorBenchmarkAutomaticRetestTarget,
+            ClashProxyName?,
+            ProxyBenchmarkRowState
+        ) -> Void = { row, target, finalLeaf, state in
+            SelectorBenchmarkPresentationStore.publish(
+                SelectorBenchmarkPresentation(
+                    selectorName: group.name,
+                    rowName: row.rowName,
+                    resolvedLeafName: finalLeaf,
+                    benchmarkURL: target.benchmarkURL,
+                    sessionIdentifier: sessionIdentifier,
+                    rowState: state
+                )
+            )
+        }
         let publishResult: (SelectorBenchmarkPlan.Target, Int) -> Void = { target, delay in
             DispatchQueue.main.async {
                 guard !session.isCancelled,
@@ -304,6 +321,101 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                 speedTestItem?.finishBenchmarkActionIfOwned(session: session)
             }
         }
+        let retestSelectedAutomaticGroup = {
+            guard !session.isCancelled,
+                  AppDelegate.shared.isActiveBenchmarkSession(session),
+                  let plan,
+                  let target = plan.selectedAutomaticRetest else {
+                finish()
+                return
+            }
+            let deferredRows = plan.orderedRows.filter(\.isDeferredAutomaticRetest)
+            guard !deferredRows.isEmpty else {
+                finish()
+                return
+            }
+
+            ApiRequest.getProxyGroupDelay(
+                groupName: target.groupName,
+                benchmarkURL: target.benchmarkURL,
+                expectedStatus: target.expectedStatus,
+                timeout: 5000,
+                session: session
+            ) { result in
+                DispatchQueue.main.async {
+                    guard !session.isCancelled,
+                          AppDelegate.shared.isActiveBenchmarkSession(session) else {
+                        finish()
+                        return
+                    }
+
+                    ApiRequest.getFreshProxyGroupList(session: session) { snapshot in
+                        DispatchQueue.main.async {
+                            guard !session.isCancelled,
+                                  AppDelegate.shared.isActiveBenchmarkSession(session) else {
+                                finish()
+                                return
+                            }
+                            guard let snapshot else {
+                                Logger.log(
+                                    "[Proxy Delay] Selected automatic group '\(target.groupName)' has no fresh topology after \(result.diagnostic)",
+                                    level: .warning
+                                )
+                                for row in deferredRows where pendingRows.remove(row.rowName) != nil {
+                                    publishAutomaticState(
+                                        row,
+                                        target,
+                                        nil,
+                                        .unavailable(displayName: row.displayName)
+                                    )
+                                }
+                                finish()
+                                return
+                            }
+
+                            let retestSnapshot = AutomaticGroupRetestSnapshot.make(
+                                groupName: target.groupName,
+                                candidateDelays: result.candidateDelays,
+                                snapshot: snapshot
+                            )
+                            let displayName: String = {
+                                guard let leaf = retestSnapshot.finalLeaf,
+                                      leaf != target.groupName else { return target.groupName }
+                                return "\(target.groupName) → \(leaf)"
+                            }()
+                            let state: ProxyBenchmarkRowState
+                            switch retestSnapshot.evidence {
+                            case let .measured(delay):
+                                state = .measured(displayName: displayName, delay: delay)
+                            case .zeroDelay:
+                                state = .failed(displayName: displayName)
+                            case let .unavailable(reason):
+                                Logger.log(
+                                    "[Proxy Delay] Selected automatic group '\(target.groupName)' path unavailable after \(result.diagnostic): \(reason)",
+                                    level: .warning
+                                )
+                                state = .unavailable(displayName: displayName)
+                            case .noMatchingCandidate:
+                                Logger.log(
+                                    "[Proxy Delay] Selected automatic group '\(target.groupName)' has no current-run evidence on fresh path '\(retestSnapshot.selectedPath.joined(separator: " → "))' after \(result.diagnostic)",
+                                    level: .warning
+                                )
+                                state = .unavailable(displayName: displayName)
+                            }
+                            for row in deferredRows where pendingRows.remove(row.rowName) != nil {
+                                publishAutomaticState(
+                                    row,
+                                    target,
+                                    retestSnapshot.finalLeaf,
+                                    state
+                                )
+                            }
+                            finish()
+                        }
+                    }
+                }
+            }
+        }
 
         ApiRequest.getMergedProxyData(session: session, timeout: 10) { response in
             guard let response, let selector = response.proxiesMap[group.name] else {
@@ -331,7 +443,9 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                 }
                 SelectorBenchmarkPresentationStore.clear(selectorName: group.name)
                 pendingRows = Set(plan.orderedRows.compactMap { row in
-                    row.measurementKey == nil ? nil : row.rowName
+                    row.measurementKey == nil && !row.isDeferredAutomaticRetest
+                        ? nil
+                        : row.rowName
                 })
                 session.onTermination {
                     guard session.isCancelled,
@@ -343,7 +457,7 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                     }
                 }
                 for row in plan.orderedRows {
-                    if row.measurementKey == nil {
+                    if row.measurementKey == nil && !row.isDeferredAutomaticRetest {
                         publishState(row, .unavailable(displayName: row.displayName))
                     } else {
                         publishState(row, .testing(displayName: row.displayName))
@@ -353,7 +467,7 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                     plan,
                     session: session,
                     result: publishResult,
-                    completion: finish
+                    completion: retestSelectedAutomaticGroup
                 )
             }
         }

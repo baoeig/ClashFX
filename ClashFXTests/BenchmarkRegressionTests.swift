@@ -455,6 +455,37 @@ final class BenchmarkRegressionTests: XCTestCase {
         XCTAssertEqual(delay, 42)
     }
 
+    func testSelectorPlanDefersOnlyCurrentlySelectedAutomaticGroup() throws {
+        let response = snapshot([
+            ["name": "Selector", "type": "Selector", "all": ["Direct", "Automatic", "Other Auto"], "now": "Automatic", "history": []],
+            ["name": "Automatic", "type": "URLTest", "all": ["Direct", "Other"], "now": "Direct", "history": [], "testUrl": "https://automatic.example.test", "expectedStatus": "204"],
+            ["name": "Other Auto", "type": "Fallback", "all": ["Other"], "now": "Other", "history": [], "testUrl": "https://other.example.test"],
+            ["name": "Direct", "type": "Direct", "history": []],
+            ["name": "Other", "type": "Vless", "history": []]
+        ])
+        let plan = try SelectorBenchmarkPlan.make(
+            selector: XCTUnwrap(response.proxiesMap["Selector"]),
+            snapshot: response,
+            benchmarkURL: "https://selector.example.test",
+            timeout: 5
+        )
+
+        XCTAssertEqual(plan.orderedRows.map(\.rowName), ["Direct", "Automatic", "Other Auto"])
+        XCTAssertEqual(
+            plan.orderedRows.filter(\.isDeferredAutomaticRetest).map(\.rowName),
+            ["Automatic"]
+        )
+        XCTAssertNil(plan.orderedRows[1].measurementKey)
+        XCTAssertEqual(plan.orderedRows[2].measurementKey?.proxyName, "Other")
+        XCTAssertEqual(plan.targets.map(\.key.proxyName), ["Direct", "Other"])
+        XCTAssertEqual(plan.selectedAutomaticRetest?.groupName, "Automatic")
+        XCTAssertEqual(
+            plan.selectedAutomaticRetest?.benchmarkURL,
+            "https://automatic.example.test"
+        )
+        XCTAssertEqual(plan.selectedAutomaticRetest?.expectedStatus, "204")
+    }
+
     func testSelectorPlanHandlesNilEmptyAndSingleLeafMembers() throws {
         let nilMembers = snapshot([
             ["name": "Selector", "type": "Selector", "history": []]
@@ -856,6 +887,30 @@ final class BenchmarkRegressionTests: XCTestCase {
                 with: original,
                 currentBenchmarkURL: "https://changed.example.test"
             ).rowState.rawDelay
+        )
+    }
+
+    func testSelectedAutomaticPresentationAcceptsItsOwnConfiguredURL() {
+        let response = snapshot([
+            ["name": "Selector", "type": "Selector", "all": ["Automatic"], "now": "Automatic", "history": []],
+            ["name": "Automatic", "type": "URLTest", "all": ["Leaf"], "now": "Leaf", "history": [], "testUrl": "https://automatic.example.test"],
+            ["name": "Leaf", "type": "Vless", "history": []]
+        ])
+        let presentation = SelectorBenchmarkPresentation(
+            selectorName: "Selector",
+            rowName: "Automatic",
+            resolvedLeafName: "Leaf",
+            benchmarkURL: "https://automatic.example.test",
+            sessionIdentifier: UUID(),
+            rowState: .measured(displayName: "Automatic → Leaf", delay: 210)
+        )
+
+        XCTAssertEqual(
+            presentation.reconciled(
+                with: response,
+                currentBenchmarkURL: "https://selector.example.test"
+            ).rowState.rawDelay,
+            210
         )
     }
 
