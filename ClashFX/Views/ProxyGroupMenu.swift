@@ -13,6 +13,8 @@ import AppKit
 
 class ProxyGroupMenu: NSMenu {
     var highlightDelegates = NSHashTable<ProxyGroupMenuHighlightDelegate>.weakObjects()
+    private var preparationState = ProxyMenuPreparationState()
+    private var prepareHandler: ((ProxyGroupMenu) -> Void)?
 
     override init(title: String) {
         super.init(title: title)
@@ -21,6 +23,21 @@ class ProxyGroupMenu: NSMenu {
 
     required init(coder: NSCoder) {
         super.init(coder: coder)
+    }
+
+    convenience init(title: String, prepareHandler: @escaping (ProxyGroupMenu) -> Void) {
+        self.init(title: title)
+        self.prepareHandler = prepareHandler
+        let placeholder = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        placeholder.isEnabled = false
+        addItem(placeholder)
+    }
+
+    func prepareIfNeeded() {
+        guard preparationState.begin(), let prepareHandler else { return }
+        self.prepareHandler = nil
+        removeAllItems()
+        prepareHandler(self)
     }
 
     func add(delegate: ProxyGroupMenuHighlightDelegate) {
@@ -33,6 +50,10 @@ class ProxyGroupMenu: NSMenu {
 }
 
 extension ProxyGroupMenu: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        prepareIfNeeded()
+    }
+
     func menuDidClose(_ menu: NSMenu) {
         highlightDelegates.allObjects.forEach { $0.highlight(item: nil) }
     }

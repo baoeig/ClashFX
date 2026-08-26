@@ -185,8 +185,6 @@ class MenuItemFactory {
     private static func generateSelectorMenuItem(proxyGroup: ClashProxy,
                                                  proxyInfo: ClashProxyResp,
                                                  leftPadding: Bool) -> NSMenuItem? {
-        let proxyMap = proxyInfo.proxiesMap
-
         let isGlobalMode = ConfigManager.shared.currentConfig?.mode == .global
         if !isGlobalMode {
             if proxyGroup.name == "GLOBAL" { return nil }
@@ -197,13 +195,29 @@ class MenuItemFactory {
         if !Settings.disableShowCurrentProxyInMenu {
             menu.view = ProxyGroupMenuItemView(proxyGroup: proxyGroup, targetProxy: selectedName, hasLeftPadding: leftPadding)
         }
-        let submenu = ProxyGroupMenu(title: proxyGroup.name)
+        let groupName = proxyGroup.name
+        let submenu = ProxyGroupMenu(title: groupName) { submenu in
+            guard let snapshot = cachedProxyData,
+                  let currentGroup = snapshot.proxiesMap[groupName],
+                  currentGroup.type == .select else { return }
+            populateSelectorSubmenu(submenu, proxyGroup: currentGroup, proxyInfo: snapshot)
+        }
+        menu.submenu = submenu
+        return menu
+    }
 
+    private static func populateSelectorSubmenu(
+        _ submenu: ProxyGroupMenu,
+        proxyGroup: ClashProxy,
+        proxyInfo: ClashProxyResp
+    ) {
         for proxy in proxyGroup.all ?? [] {
-            guard let proxyModel = proxyMap[proxy] else { continue }
-            let proxyItem = ProxyMenuItem(proxy: proxyModel,
-                                          group: proxyGroup,
-                                          action: #selector(MenuItemFactory.actionSelectProxy(sender:)))
+            guard let proxyModel = proxyInfo.proxiesMap[proxy] else { continue }
+            let proxyItem = ProxyMenuItem(
+                proxy: proxyModel,
+                group: proxyGroup,
+                action: #selector(MenuItemFactory.actionSelectProxy(sender:))
+            )
             proxyItem.target = MenuItemFactory.self
             submenu.add(delegate: proxyItem)
             submenu.addItem(proxyItem)
@@ -212,25 +226,36 @@ class MenuItemFactory {
         if proxyGroup.isSpeedTestable && useViewToRenderProxy {
             submenu.minimumWidth = proxyGroup.maxProxyNameLength + ProxyItemView.fixedPlaceHolderWidth
         }
-
         addSpeedTestMenuItem(submenu, proxyGroup: proxyGroup)
-        menu.submenu = submenu
-        return menu
     }
 
     private static func generateUrlTestFallBackMenuItem(proxyGroup: ClashProxy,
                                                         proxyInfo: ClashProxyResp,
                                                         leftPadding: Bool) -> NSMenuItem? {
-        let proxyMap = proxyInfo.proxiesMap
         let selectedName = proxyGroup.now ?? ""
         let menu = NSMenuItem(title: proxyGroup.name, action: nil, keyEquivalent: "")
         if !Settings.disableShowCurrentProxyInMenu {
             menu.view = ProxyGroupMenuItemView(proxyGroup: proxyGroup, targetProxy: selectedName, hasLeftPadding: leftPadding)
         }
-        let submenu = NSMenu(title: proxyGroup.name)
+        let groupName = proxyGroup.name
+        let submenu = ProxyGroupMenu(title: groupName) { submenu in
+            guard let snapshot = cachedProxyData,
+                  let currentGroup = snapshot.proxiesMap[groupName],
+                  currentGroup.type == .urltest || currentGroup.type == .fallback else { return }
+            populateAutomaticSubmenu(submenu, proxyGroup: currentGroup, proxyInfo: snapshot)
+        }
+        menu.submenu = submenu
+        return menu
+    }
 
+    private static func populateAutomaticSubmenu(
+        _ submenu: ProxyGroupMenu,
+        proxyGroup: ClashProxy,
+        proxyInfo: ClashProxyResp
+    ) {
+        let selectedName = proxyGroup.now ?? ""
         for proxyName in proxyGroup.all ?? [] {
-            guard let proxy = proxyMap[proxyName] else { continue }
+            guard let proxy = proxyInfo.proxiesMap[proxyName] else { continue }
             let proxyMenuItem = ProxyMenuItem(proxy: proxy, group: proxyGroup, action: #selector(empty), simpleItem: true)
             proxyMenuItem.target = MenuItemFactory.self
             if proxy.name == selectedName {
@@ -247,8 +272,6 @@ class MenuItemFactory {
             submenu.addItem(proxyMenuItem)
         }
         addSpeedTestMenuItem(submenu, proxyGroup: proxyGroup)
-        menu.submenu = submenu
-        return menu
     }
 
     private static func addSpeedTestMenuItem(_ menu: NSMenu, proxyGroup: ClashProxy) {
@@ -261,16 +284,28 @@ class MenuItemFactory {
     }
 
     private static func generateLoadBalanceMenuItem(proxyGroup: ClashProxy, proxyInfo: ClashProxyResp, leftPadding: Bool) -> NSMenuItem? {
-        let proxyMap = proxyInfo.proxiesMap
-
         let menu = NSMenuItem(title: proxyGroup.name, action: nil, keyEquivalent: "")
         if !Settings.disableShowCurrentProxyInMenu {
             menu.view = ProxyGroupMenuItemView(proxyGroup: proxyGroup, targetProxy: NSLocalizedString("Load Balance", comment: ""), hasLeftPadding: leftPadding)
         }
-        let submenu = ProxyGroupMenu(title: proxyGroup.name)
+        let groupName = proxyGroup.name
+        let submenu = ProxyGroupMenu(title: groupName) { submenu in
+            guard let snapshot = cachedProxyData,
+                  let currentGroup = snapshot.proxiesMap[groupName],
+                  currentGroup.type == .loadBalance else { return }
+            populateLoadBalanceSubmenu(submenu, proxyGroup: currentGroup, proxyInfo: snapshot)
+        }
+        menu.submenu = submenu
+        return menu
+    }
 
+    private static func populateLoadBalanceSubmenu(
+        _ submenu: ProxyGroupMenu,
+        proxyGroup: ClashProxy,
+        proxyInfo: ClashProxyResp
+    ) {
         for proxy in proxyGroup.all ?? [] {
-            guard let proxyModel = proxyMap[proxy] else { continue }
+            guard let proxyModel = proxyInfo.proxiesMap[proxy] else { continue }
             let proxyItem = ProxyMenuItem(proxy: proxyModel,
                                           group: proxyGroup,
                                           action: #selector(empty))
@@ -282,18 +317,28 @@ class MenuItemFactory {
             submenu.minimumWidth = proxyGroup.maxProxyNameLength + ProxyItemView.fixedPlaceHolderWidth
         }
         addSpeedTestMenuItem(submenu, proxyGroup: proxyGroup)
-        menu.submenu = submenu
-
-        return menu
     }
 
     private static func generateListOnlyMenuItem(proxyGroup: ClashProxy, proxyInfo: ClashProxyResp) -> NSMenuItem? {
         let menu = NSMenuItem(title: proxyGroup.name, action: nil, keyEquivalent: "")
-        let submenu = ProxyGroupMenu(title: proxyGroup.name)
-        let proxyMap = proxyInfo.proxiesMap
+        let groupName = proxyGroup.name
+        let submenu = ProxyGroupMenu(title: groupName) { submenu in
+            guard let snapshot = cachedProxyData,
+                  let currentGroup = snapshot.proxiesMap[groupName],
+                  currentGroup.type == .relay else { return }
+            populateListOnlySubmenu(submenu, proxyGroup: currentGroup, proxyInfo: snapshot)
+        }
+        menu.submenu = submenu
+        return menu
+    }
 
+    private static func populateListOnlySubmenu(
+        _ submenu: ProxyGroupMenu,
+        proxyGroup: ClashProxy,
+        proxyInfo: ClashProxyResp
+    ) {
         for proxy in proxyGroup.all ?? [] {
-            guard let proxyModel = proxyMap[proxy] else { continue }
+            guard let proxyModel = proxyInfo.proxiesMap[proxy] else { continue }
             let proxyItem = ProxyMenuItem(proxy: proxyModel,
                                           group: proxyGroup,
                                           action: #selector(empty),
@@ -302,8 +347,6 @@ class MenuItemFactory {
             submenu.add(delegate: proxyItem)
             submenu.addItem(proxyItem)
         }
-        menu.submenu = submenu
-        return menu
     }
 }
 

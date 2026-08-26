@@ -995,6 +995,15 @@ final class ProxyMenuRefreshPolicyTests: XCTestCase {
         XCTAssertNotNil(coordinator.request(.incremental, now: start.addingTimeInterval(1.3)))
     }
 
+    func testProxyMenuPreparationCanBeginOnlyOnce() {
+        var state = ProxyMenuPreparationState()
+
+        XCTAssertFalse(state.isPrepared)
+        XCTAssertTrue(state.begin())
+        XCTAssertTrue(state.isPrepared)
+        XCTAssertFalse(state.begin())
+    }
+
     func testRebuildInvalidatesIncrementalResultAndRunsAfterItSettles() throws {
         var coordinator = ProxyMenuRefreshCoordinator(minimumIncrementalInterval: 1)
         let start = Date(timeIntervalSince1970: 100)

@@ -68,6 +68,16 @@ enum ClashProxyType: String, Codable, Hashable {
 typealias ClashProxyName = String
 typealias ClashProviderName = String
 
+struct ProxyMenuPreparationState {
+    private(set) var isPrepared = false
+
+    mutating func begin() -> Bool {
+        guard !isPrepared else { return false }
+        isPrepared = true
+        return true
+    }
+}
+
 struct ProxyMenuRefreshCoordinator {
     enum Mode: Equatable {
         case incremental
