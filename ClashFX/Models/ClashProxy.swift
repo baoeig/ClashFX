@@ -9,7 +9,7 @@
 import Cocoa
 import SwiftyJSON
 
-enum ClashProxyType: String, Codable {
+enum ClashProxyType: String, Codable, Hashable {
     case urltest = "URLTest"
     case fallback = "Fallback"
     case loadBalance = "LoadBalance"
@@ -164,6 +164,12 @@ struct SelectorBenchmarkMeasurementKey: Hashable {
     let timeout: Int
 }
 
+struct SelectorBenchmarkSchedulingBucket: Hashable {
+    let endpoint: SelectorBenchmarkEndpoint
+    let providerName: ClashProviderName?
+    let proxyType: ClashProxyType
+}
+
 enum SelectorBenchmarkUnavailableReason: Hashable {
     case cycle(ClashProxyName)
     case missingNode(ClashProxyName)
@@ -236,6 +242,8 @@ struct SelectorBenchmarkRow {
     let rowName: ClashProxyName
     let displayName: String
     let measurementKey: SelectorBenchmarkMeasurementKey?
+    let schedulingBucket: SelectorBenchmarkSchedulingBucket?
+    let isDeferredAutomaticRetest: Bool
     let unavailableReason: SelectorBenchmarkUnavailableReason?
 }
 
@@ -243,15 +251,9 @@ struct SelectorBenchmarkConcurrencyPolicy {
     private static let minimumConcurrency = 4
     private static let initialConcurrency = 8
     private static let maximumConcurrency = 16
-    private static let evaluationWindowSize = 8
-    private static let healthyWindowMaximumFailures = 2
-    private static let clusteredFailureMinimum = 4
     private static let adjustmentStep = 4
 
     private let targetCount: Int
-    private var windowCompletionCount = 0
-    private var windowFailureCount = 0
-
     private(set) var currentLimit: Int
 
     var minimumLimit: Int {
@@ -268,23 +270,17 @@ struct SelectorBenchmarkConcurrencyPolicy {
         currentLimit = max(1, min(normalizedTargetCount, Self.initialConcurrency))
     }
 
-    mutating func recordCompletion(succeeded: Bool) {
-        guard targetCount > 0 else { return }
-        windowCompletionCount += 1
-        if !succeeded {
-            windowFailureCount += 1
-        }
+    mutating func recordCohort(_ outcomes: [Bool]) {
+        guard targetCount > 0, !outcomes.isEmpty else { return }
+        let failureCount = outcomes.filter { !$0 }.count
+        let healthyMaximumFailures = outcomes.count / 4
+        let clusteredFailureMinimum = max(2, outcomes.count / 2)
 
-        guard windowCompletionCount >= Self.evaluationWindowSize else { return }
-
-        if windowFailureCount <= Self.healthyWindowMaximumFailures {
+        if failureCount <= healthyMaximumFailures {
             currentLimit = min(maximumLimit, currentLimit + Self.adjustmentStep)
-        } else if windowFailureCount >= Self.clusteredFailureMinimum {
+        } else if failureCount >= clusteredFailureMinimum {
             currentLimit = max(minimumLimit, currentLimit - Self.adjustmentStep)
         }
-
-        windowCompletionCount = 0
-        windowFailureCount = 0
     }
 }
 
@@ -297,6 +293,7 @@ final class AdaptiveAsyncTaskRunner {
     private var policy: SelectorBenchmarkConcurrencyPolicy
     private var nextTaskIndex = 0
     private var activeTaskCount = 0
+    private var cohortOutcomes = [Bool]()
     private var completion: (() -> Void)?
 
     init(tasks: [Task],
@@ -315,7 +312,20 @@ final class AdaptiveAsyncTaskRunner {
     }
 
     private func scheduleAvailableTasks() {
-        while activeTaskCount < policy.currentLimit, nextTaskIndex < tasks.count {
+        guard activeTaskCount == 0 else { return }
+
+        if nextTaskIndex == tasks.count {
+            let completion = completion
+            self.completion = nil
+            DispatchQueue.main.async {
+                completion?()
+            }
+            return
+        }
+
+        cohortOutcomes.removeAll(keepingCapacity: true)
+        let cohortEndIndex = min(tasks.count, nextTaskIndex + policy.currentLimit)
+        while nextTaskIndex < cohortEndIndex {
             let task = tasks[nextTaskIndex]
             nextTaskIndex += 1
             activeTaskCount += 1
@@ -323,8 +333,10 @@ final class AdaptiveAsyncTaskRunner {
             task { succeeded in
                 self.stateQueue.async {
                     self.activeTaskCount -= 1
+                    self.cohortOutcomes.append(succeeded)
+                    guard self.activeTaskCount == 0 else { return }
                     let previousLimit = self.policy.currentLimit
-                    self.policy.recordCompletion(succeeded: succeeded)
+                    self.policy.recordCohort(self.cohortOutcomes)
                     if self.policy.currentLimit != previousLimit {
                         self.limitChanged?(previousLimit, self.policy.currentLimit)
                     }
@@ -332,24 +344,62 @@ final class AdaptiveAsyncTaskRunner {
                 }
             }
         }
+    }
+}
 
-        guard nextTaskIndex == tasks.count, activeTaskCount == 0 else { return }
-        let completion = completion
-        self.completion = nil
-        DispatchQueue.main.async {
-            completion?()
-        }
+struct SelectorBenchmarkRetryPolicy {
+    let maxConcurrentRequests = 2
+
+    func retryTargets(
+        from targets: [SelectorBenchmarkPlan.Target],
+        firstPassDelays: [SelectorBenchmarkMeasurementKey: Int]
+    ) -> [SelectorBenchmarkPlan.Target] {
+        return targets.filter { (firstPassDelays[$0.key] ?? 0) <= 0 }
+    }
+
+    func finalDelay(
+        for target: SelectorBenchmarkPlan.Target,
+        firstPassDelays: [SelectorBenchmarkMeasurementKey: Int],
+        retryDelays: [SelectorBenchmarkMeasurementKey: Int]
+    ) -> Int {
+        return retryDelays[target.key] ?? firstPassDelays[target.key] ?? 0
     }
 }
 
 struct SelectorBenchmarkPlan {
     struct Target {
         let key: SelectorBenchmarkMeasurementKey
+        let schedulingBucket: SelectorBenchmarkSchedulingBucket
         let aliases: [SelectorBenchmarkRow]
     }
 
     let orderedRows: [SelectorBenchmarkRow]
     let targets: [Target]
+
+    var interleavedTargets: [Target] {
+        var bucketOrder = [SelectorBenchmarkSchedulingBucket]()
+        var bucketTargets = [SelectorBenchmarkSchedulingBucket: [Target]]()
+        for target in targets {
+            if bucketTargets[target.schedulingBucket] == nil {
+                bucketOrder.append(target.schedulingBucket)
+            }
+            bucketTargets[target.schedulingBucket, default: []].append(target)
+        }
+
+        var nextIndex = [SelectorBenchmarkSchedulingBucket: Int]()
+        var ordered = [Target]()
+        while ordered.count < targets.count {
+            for bucket in bucketOrder {
+                let index = nextIndex[bucket, default: 0]
+                guard let candidates = bucketTargets[bucket], index < candidates.count else {
+                    continue
+                }
+                ordered.append(candidates[index])
+                nextIndex[bucket] = index + 1
+            }
+        }
+        return ordered
+    }
 
     var concurrencyPolicy: SelectorBenchmarkConcurrencyPolicy {
         return SelectorBenchmarkConcurrencyPolicy(targetCount: targets.count)
@@ -368,6 +418,7 @@ struct SelectorBenchmarkPlan {
         let visibleNames = selector.all ?? []
         var orderedRows = [SelectorBenchmarkRow]()
         var aliases = [SelectorBenchmarkMeasurementKey: [SelectorBenchmarkRow]]()
+        var schedulingBuckets = [SelectorBenchmarkMeasurementKey: SelectorBenchmarkSchedulingBucket]()
         var targetOrder = [SelectorBenchmarkMeasurementKey]()
 
         for visibleName in visibleNames {
@@ -384,11 +435,15 @@ struct SelectorBenchmarkPlan {
                 targetOrder.append(key)
             }
             aliases[key]?.append(row)
+            if let schedulingBucket = row.schedulingBucket {
+                schedulingBuckets[key] = schedulingBucket
+            }
         }
 
         let targets = targetOrder.compactMap { key -> Target? in
-            guard let rows = aliases[key], !rows.isEmpty else { return nil }
-            return Target(key: key, aliases: rows)
+            guard let rows = aliases[key], !rows.isEmpty,
+                  let schedulingBucket = schedulingBuckets[key] else { return nil }
+            return Target(key: key, schedulingBucket: schedulingBucket, aliases: rows)
         }
         return SelectorBenchmarkPlan(orderedRows: orderedRows, targets: targets)
     }
@@ -421,6 +476,12 @@ struct SelectorBenchmarkPlan {
                     benchmarkURL: benchmarkURL,
                     timeout: timeout
                 ),
+                schedulingBucket: SelectorBenchmarkSchedulingBucket(
+                    endpoint: endpoint,
+                    providerName: providerName,
+                    proxyType: proxy.type
+                ),
+                isDeferredAutomaticRetest: false,
                 unavailableReason: nil
             )
         case let .unavailable(_, reason):
@@ -432,6 +493,8 @@ struct SelectorBenchmarkPlan {
                 rowName: visibleName,
                 displayName: visibleName,
                 measurementKey: nil,
+                schedulingBucket: nil,
+                isDeferredAutomaticRetest: false,
                 unavailableReason: reason
             )
         }

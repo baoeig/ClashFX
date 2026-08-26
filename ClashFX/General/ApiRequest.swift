@@ -968,47 +968,52 @@ class ApiRequest {
             return
         }
 
-        typealias DelayTask = AdaptiveAsyncTaskRunner.Task
-        let tasks: [DelayTask] = plan.targets.map { target in
-            return { done in
-                guard !session.isCancelled else {
-                    done(false)
+        let resultQueue = DispatchQueue(label: "com.clashfx.selectorBenchmarkResults")
+        var firstPassDelays = [SelectorBenchmarkMeasurementKey: Int]()
+        var retryDelays = [SelectorBenchmarkMeasurementKey: Int]()
+
+        let runTarget: (SelectorBenchmarkPlan.Target, @escaping (Int) -> Void) -> Void = { target, done in
+            guard !session.isCancelled else {
+                done(0)
+                return
+            }
+            switch target.key.endpoint {
+            case .inline:
+                getProxyDelay(
+                    proxyName: target.key.proxyName,
+                    benchmarkURL: target.key.benchmarkURL,
+                    timeout: target.key.timeout,
+                    session: session,
+                    callback: done
+                )
+            case .provider:
+                guard let providerName = target.key.providerName else {
+                    Logger.log(
+                        "[Proxy Delay] Selector provider target '\(target.key.proxyName)' has no provider name",
+                        level: .error
+                    )
+                    done(0)
                     return
                 }
-                switch target.key.endpoint {
-                case .inline:
-                    getProxyDelay(
-                        proxyName: target.key.proxyName,
-                        benchmarkURL: target.key.benchmarkURL,
-                        timeout: target.key.timeout,
-                        session: session
-                    ) { delay in
-                        if !session.isCancelled {
-                            result(target, delay)
-                        }
-                        done(delay > 0)
+                getProviderProxyDelay(
+                    providerName: providerName,
+                    proxyName: target.key.proxyName,
+                    benchmarkURL: target.key.benchmarkURL,
+                    timeout: target.key.timeout,
+                    session: session,
+                    callback: done
+                )
+            }
+        }
+
+        typealias DelayTask = AdaptiveAsyncTaskRunner.Task
+        let tasks: [DelayTask] = plan.interleavedTargets.map { target in
+            return { done in
+                runTarget(target) { delay in
+                    resultQueue.sync {
+                        firstPassDelays[target.key] = delay
                     }
-                case .provider:
-                    guard let providerName = target.key.providerName else {
-                        Logger.log(
-                            "[Proxy Delay] Selector provider target '\(target.key.proxyName)' has no provider name",
-                            level: .error
-                        )
-                        done(false)
-                        return
-                    }
-                    getProviderProxyDelay(
-                        providerName: providerName,
-                        proxyName: target.key.proxyName,
-                        benchmarkURL: target.key.benchmarkURL,
-                        timeout: target.key.timeout,
-                        session: session
-                    ) { delay in
-                        if !session.isCancelled {
-                            result(target, delay)
-                        }
-                        done(delay > 0)
-                    }
+                    done(delay > 0)
                 }
             }
         }
@@ -1030,7 +1035,62 @@ class ApiRequest {
                 )
             }
         )
-        .start(completion: completion)
+        .start {
+            guard !session.isCancelled else {
+                completion()
+                return
+            }
+
+            let retryPolicy = SelectorBenchmarkRetryPolicy()
+            let retryTargets = resultQueue.sync {
+                retryPolicy.retryTargets(from: plan.targets, firstPassDelays: firstPassDelays)
+            }
+            guard !retryTargets.isEmpty else {
+                let finalDelays = resultQueue.sync { firstPassDelays }
+                for target in plan.targets {
+                    result(target, finalDelays[target.key] ?? 0)
+                }
+                completion()
+                return
+            }
+
+            Logger.log(
+                "[Proxy Delay] Retrying \(retryTargets.count) failed Selector target(s), "
+                    + "max concurrency \(retryPolicy.maxConcurrentRequests)"
+            )
+            let retryTasks: [LimitedAsyncTaskRunner.Task] = retryTargets.map { target in
+                return { done in
+                    runTarget(target) { delay in
+                        resultQueue.sync {
+                            retryDelays[target.key] = delay
+                        }
+                        done()
+                    }
+                }
+            }
+            LimitedAsyncTaskRunner(
+                tasks: retryTasks,
+                maxConcurrent: retryPolicy.maxConcurrentRequests
+            )
+            .start {
+                guard !session.isCancelled else {
+                    completion()
+                    return
+                }
+                let delays = resultQueue.sync { (firstPassDelays, retryDelays) }
+                for target in plan.targets {
+                    result(
+                        target,
+                        retryPolicy.finalDelay(
+                            for: target,
+                            firstPassDelays: delays.0,
+                            retryDelays: delays.1
+                        )
+                    )
+                }
+                completion()
+            }
+        }
     }
 
     private static func benchmarkRequestTimeout(for coreTimeoutMilliseconds: Int) -> TimeInterval {

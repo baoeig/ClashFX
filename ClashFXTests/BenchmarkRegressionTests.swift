@@ -566,46 +566,30 @@ final class BenchmarkRegressionTests: XCTestCase {
         var policy = SelectorBenchmarkConcurrencyPolicy(targetCount: 49)
         XCTAssertEqual(policy.currentLimit, 8)
 
-        for _ in 0 ..< 8 {
-            policy.recordCompletion(succeeded: true)
-        }
+        policy.recordCohort(Array(repeating: true, count: 8))
         XCTAssertEqual(policy.currentLimit, 12)
 
-        for _ in 0 ..< 6 {
-            policy.recordCompletion(succeeded: true)
-        }
-        for _ in 0 ..< 2 {
-            policy.recordCompletion(succeeded: false)
-        }
+        policy.recordCohort(Array(repeating: true, count: 10) + [false, false])
         XCTAssertEqual(policy.currentLimit, 16)
 
-        for _ in 0 ..< 8 {
-            policy.recordCompletion(succeeded: true)
-        }
+        policy.recordCohort(Array(repeating: true, count: 16))
         XCTAssertEqual(policy.currentLimit, 16)
     }
 
     func testSelectorConcurrencyHoldsForMixedWindowAndBacksOffOnClusteredFailures() {
         var policy = SelectorBenchmarkConcurrencyPolicy(targetCount: 49)
 
-        for _ in 0 ..< 5 {
-            policy.recordCompletion(succeeded: true)
-        }
-        for _ in 0 ..< 3 {
-            policy.recordCompletion(succeeded: false)
-        }
+        policy.recordCohort(Array(repeating: true, count: 5) + Array(repeating: false, count: 3))
         XCTAssertEqual(policy.currentLimit, 8)
 
-        for _ in 0 ..< 4 {
-            policy.recordCompletion(succeeded: true)
-            policy.recordCompletion(succeeded: false)
-        }
+        policy.recordCohort(Array(repeating: true, count: 4) + Array(repeating: false, count: 4))
         XCTAssertEqual(policy.currentLimit, 4)
 
-        for _ in 0 ..< 8 {
-            policy.recordCompletion(succeeded: false)
-        }
+        policy.recordCohort(Array(repeating: false, count: 8))
         XCTAssertEqual(policy.currentLimit, 4)
+
+        policy.recordCohort(Array(repeating: true, count: 4))
+        XCTAssertEqual(policy.currentLimit, 8)
     }
 
     func testSelectorConcurrencyNeverExceedsSmallPlanSize() {
@@ -614,10 +598,129 @@ final class BenchmarkRegressionTests: XCTestCase {
         XCTAssertEqual(policy.currentLimit, 3)
         XCTAssertEqual(policy.maximumLimit, 3)
 
-        for _ in 0 ..< 8 {
-            policy.recordCompletion(succeeded: true)
-        }
+        policy.recordCohort(Array(repeating: true, count: 3))
         XCTAssertEqual(policy.currentLimit, 3)
+    }
+
+    func testSelectorExecutionInterleavesProtocolBucketsWithoutChangingRows() throws {
+        let trojans = (1 ... 14).map { "Trojan \($0)" }
+        let vless = (1 ... 6).map { "VLESS \($0)" }
+        let hysteria = (1 ... 6).map { "HY2 \($0)" }
+        let names = trojans + vless + hysteria
+        var proxies: [[String: Any]] = [
+            ["name": "Selector", "type": "Selector", "all": names, "now": names[0], "history": []]
+        ]
+        proxies.append(contentsOf: trojans.map { ["name": $0, "type": "Trojan", "history": []] })
+        proxies.append(contentsOf: vless.map { ["name": $0, "type": "Vless", "history": []] })
+        proxies.append(contentsOf: hysteria.map { ["name": $0, "type": "Hysteria2", "history": []] })
+
+        let response = snapshot(proxies)
+        let plan = try SelectorBenchmarkPlan.make(
+            selector: XCTUnwrap(response.proxiesMap["Selector"]),
+            snapshot: response,
+            benchmarkURL: "https://benchmark.example.test",
+            timeout: 5
+        )
+
+        XCTAssertEqual(plan.orderedRows.map(\.rowName), names)
+        XCTAssertEqual(
+            plan.interleavedTargets.prefix(8).map(\.schedulingBucket.proxyType),
+            [.trojan, .vless, .hysteria2, .trojan, .vless, .hysteria2, .trojan, .vless]
+        )
+    }
+
+    func testAdaptiveRunnerWaitsForWholeCohortBeforeRamping() {
+        let firstCohortStarted = expectation(description: "first cohort started")
+        firstCohortStarted.expectedFulfillmentCount = 8
+        let secondCohortStarted = expectation(description: "second cohort started")
+        secondCohortStarted.expectedFulfillmentCount = 12
+        let partialCohortSettled = expectation(description: "partial cohort settled")
+        let completed = expectation(description: "runner completes")
+        let lock = NSLock()
+        var firstCohortCompletions = [(Bool) -> Void]()
+        var startedTaskCount = 0
+
+        let tasks: [AdaptiveAsyncTaskRunner.Task] = (0 ..< 20).map { index in
+            return { done in
+                lock.lock()
+                startedTaskCount += 1
+                lock.unlock()
+                if index < 8 {
+                    lock.lock()
+                    firstCohortCompletions.append(done)
+                    lock.unlock()
+                    firstCohortStarted.fulfill()
+                } else {
+                    secondCohortStarted.fulfill()
+                    done(true)
+                }
+            }
+        }
+        AdaptiveAsyncTaskRunner(
+            tasks: tasks,
+            policy: SelectorBenchmarkConcurrencyPolicy(targetCount: tasks.count)
+        ).start {
+            completed.fulfill()
+        }
+
+        wait(for: [firstCohortStarted], timeout: 2)
+        lock.lock()
+        let completions = firstCohortCompletions
+        lock.unlock()
+        for done in completions.dropLast() {
+            done(true)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            partialCohortSettled.fulfill()
+        }
+        wait(for: [partialCohortSettled], timeout: 1)
+        lock.lock()
+        let partialStartedTaskCount = startedTaskCount
+        lock.unlock()
+        XCTAssertEqual(partialStartedTaskCount, 8)
+        completions.last?(true)
+        wait(for: [secondCohortStarted, completed], timeout: 2)
+    }
+
+    func testSelectorRetryPolicyRetriesOnlyFailuresOnceAndUsesRetryResult() throws {
+        let names = ["First", "Second", "Third"]
+        let response = snapshot([
+            ["name": "Selector", "type": "Selector", "all": names, "now": names[0], "history": []],
+            ["name": "First", "type": "Trojan", "history": []],
+            ["name": "Second", "type": "Vless", "history": []],
+            ["name": "Third", "type": "Hysteria2", "history": []]
+        ])
+        let plan = try SelectorBenchmarkPlan.make(
+            selector: XCTUnwrap(response.proxiesMap["Selector"]),
+            snapshot: response,
+            benchmarkURL: "https://benchmark.example.test",
+            timeout: 5
+        )
+        let firstPass = Dictionary(uniqueKeysWithValues: zip(
+            plan.targets.map(\.key),
+            [120, 0, 0]
+        ))
+        let policy = SelectorBenchmarkRetryPolicy()
+        let retryTargets = policy.retryTargets(from: plan.targets, firstPassDelays: firstPass)
+
+        XCTAssertEqual(policy.maxConcurrentRequests, 2)
+        XCTAssertEqual(retryTargets.map(\.key.proxyName), ["Second", "Third"])
+        XCTAssertEqual(
+            policy.finalDelay(
+                for: retryTargets[0],
+                firstPassDelays: firstPass,
+                retryDelays: [retryTargets[0].key: 240]
+            ),
+            240
+        )
+        XCTAssertEqual(
+            policy.finalDelay(
+                for: retryTargets[1],
+                firstPassDelays: firstPass,
+                retryDelays: [:]
+            ),
+            0
+        )
     }
 
     func testAdaptiveRunnerAppliesPolicyLimitChanges() {
