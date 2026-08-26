@@ -189,6 +189,10 @@ class ApiRequest {
     private var lastProxyCacheFallbackLogDate = Date.distantPast
 
     static let clashRequestQueue = DispatchQueue(label: "com.clashfx.clashRequestQueue")
+    private static let proxySnapshotDecodeQueue = DispatchQueue(
+        label: "com.clashfx.proxySnapshotDecodeQueue",
+        qos: .userInitiated
+    )
 
     private init() {
         let configuration = URLSessionConfiguration.default
@@ -424,7 +428,7 @@ class ApiRequest {
     }
 
     static func requestProxyGroupList(completeHandler: ((ClashProxyResp) -> Void)? = nil) {
-        req("/proxies").responseData { res in
+        req("/proxies").responseData(queue: proxySnapshotDecodeQueue) { res in
             let statusCode = res.response?.statusCode ?? -1
             if case let .success(data) = res.result,
                (200 ..< 300).contains(statusCode),
@@ -432,7 +436,9 @@ class ApiRequest {
                root["proxies"] is [String: Any] {
                 let proxies = ClashProxyResp(data)
                 ApiRequest.shared.proxyRespCacheData = data
-                completeHandler?(proxies)
+                DispatchQueue.main.async {
+                    completeHandler?(proxies)
+                }
                 return
             }
 
@@ -448,7 +454,9 @@ class ApiRequest {
                         level: .warning
                     )
                 }
-                completeHandler?(cached)
+                DispatchQueue.main.async {
+                    completeHandler?(cached)
+                }
                 return
             }
 
@@ -456,19 +464,29 @@ class ApiRequest {
                 "Proxy API unavailable (status=\(statusCode)) and no valid snapshot exists",
                 level: .warning
             )
-            completeHandler?(ClashProxyResp(nil))
+            DispatchQueue.main.async {
+                completeHandler?(ClashProxyResp(nil))
+            }
         }
     }
 
     static func requestProxyProviderList(completeHandler: ((ClashProviderResp) -> Void)? = nil) {
         req("/providers/proxies")
-            .responseDecodable(of: ClashProviderResp.self, decoder: ClashProviderResp.decoder) { resp in
+            .responseDecodable(
+                of: ClashProviderResp.self,
+                queue: proxySnapshotDecodeQueue,
+                decoder: ClashProviderResp.decoder
+            ) { resp in
+                let result: ClashProviderResp
                 switch resp.result {
                 case let .success(providerResp):
-                    completeHandler?(providerResp)
+                    result = providerResp
                 case let .failure(err):
                     Logger.log("\(err)")
-                    completeHandler?(ClashProviderResp())
+                    result = ClashProviderResp()
+                }
+                DispatchQueue.main.async {
+                    completeHandler?(result)
                 }
             }
     }

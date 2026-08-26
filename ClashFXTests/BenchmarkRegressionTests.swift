@@ -971,6 +971,97 @@ final class BenchmarkRegressionTests: XCTestCase {
     }
 }
 
+final class ProxyMenuRefreshPolicyTests: XCTestCase {
+    private func snapshot(_ proxyJSON: [[String: Any]]) -> ClashProxyResp {
+        let proxies = Dictionary(uniqueKeysWithValues: proxyJSON.compactMap { proxy -> (String, Any)? in
+            guard let name = proxy["name"] as? String else { return nil }
+            return (name, proxy)
+        })
+        let data = try! JSONSerialization.data(withJSONObject: ["proxies": proxies])
+        return ClashProxyResp(data)
+    }
+
+    func testIncrementalRefreshesAreSingleFlightAndThrottledAfterCompletion() throws {
+        var coordinator = ProxyMenuRefreshCoordinator(minimumIncrementalInterval: 1)
+        let start = Date(timeIntervalSince1970: 100)
+
+        let first = try XCTUnwrap(coordinator.request(.incremental, now: start))
+        XCTAssertNil(coordinator.request(.incremental, now: start.addingTimeInterval(0.1)))
+
+        let completion = coordinator.complete(first, now: start.addingTimeInterval(0.2))
+        XCTAssertTrue(completion.shouldApply)
+        XCTAssertNil(completion.nextTicket)
+        XCTAssertNil(coordinator.request(.incremental, now: start.addingTimeInterval(1.1)))
+        XCTAssertNotNil(coordinator.request(.incremental, now: start.addingTimeInterval(1.3)))
+    }
+
+    func testRebuildInvalidatesIncrementalResultAndRunsAfterItSettles() throws {
+        var coordinator = ProxyMenuRefreshCoordinator(minimumIncrementalInterval: 1)
+        let start = Date(timeIntervalSince1970: 100)
+        let incremental = try XCTUnwrap(coordinator.request(.incremental, now: start))
+
+        XCTAssertNil(coordinator.request(.rebuild, now: start.addingTimeInterval(0.1)))
+        let staleCompletion = coordinator.complete(incremental, now: start.addingTimeInterval(0.2))
+        XCTAssertFalse(staleCompletion.shouldApply)
+
+        let rebuild = try XCTUnwrap(staleCompletion.nextTicket)
+        XCTAssertEqual(rebuild.mode, .rebuild)
+        XCTAssertGreaterThan(rebuild.generation, incremental.generation)
+        XCTAssertTrue(coordinator.complete(rebuild, now: start.addingTimeInterval(0.3)).shouldApply)
+    }
+
+    func testRepeatedRebuildsCollapseToLatestGeneration() throws {
+        var coordinator = ProxyMenuRefreshCoordinator()
+        let first = try XCTUnwrap(coordinator.request(.rebuild))
+        XCTAssertNil(coordinator.request(.rebuild))
+        XCTAssertNil(coordinator.request(.rebuild))
+
+        let staleCompletion = coordinator.complete(first)
+        XCTAssertFalse(staleCompletion.shouldApply)
+        let latest = try XCTUnwrap(staleCompletion.nextTicket)
+        XCTAssertEqual(latest.generation, first.generation + 2)
+        XCTAssertTrue(coordinator.complete(latest).shouldApply)
+    }
+
+    func testStructureSignatureDetectsMembershipAndBenchmarkChanges() {
+        let original = snapshot([
+            ["name": "Selector", "type": "Selector", "all": ["Leaf"], "now": "Leaf", "history": [], "testUrl": "https://one.example"],
+            ["name": "Leaf", "type": "Direct", "history": []]
+        ])
+        let changed = snapshot([
+            ["name": "Selector", "type": "Selector", "all": ["Leaf", "Other"], "now": "Leaf", "history": [], "testUrl": "https://two.example"],
+            ["name": "Leaf", "type": "Direct", "history": []],
+            ["name": "Other", "type": "Direct", "history": []]
+        ])
+
+        XCTAssertNotEqual(
+            ProxyMenuStructureSignature(snapshot: original),
+            ProxyMenuStructureSignature(snapshot: changed)
+        )
+    }
+
+    func testChangedLeafNotifiesEveryAffectedAncestorOnly() {
+        let original = snapshot([
+            ["name": "Selector", "type": "Selector", "all": ["Automatic", "Stable"], "now": "Automatic", "history": []],
+            ["name": "Automatic", "type": "URLTest", "all": ["Leaf"], "now": "Leaf", "history": []],
+            ["name": "Leaf", "type": "Vless", "alive": true, "history": []],
+            ["name": "Stable", "type": "Direct", "alive": true, "history": []]
+        ])
+        let current = snapshot([
+            ["name": "Selector", "type": "Selector", "all": ["Automatic", "Stable"], "now": "Automatic", "history": []],
+            ["name": "Automatic", "type": "URLTest", "all": ["Leaf"], "now": "Leaf", "history": []],
+            ["name": "Leaf", "type": "Vless", "alive": false, "history": []],
+            ["name": "Stable", "type": "Direct", "alive": true, "history": []]
+        ])
+
+        XCTAssertEqual(
+            ProxyMenuSnapshotDelta.affectedNames(previous: original, current: current),
+            Set(["Leaf", "Automatic", "Selector"])
+        )
+        XCTAssertTrue(ProxyMenuSnapshotDelta.affectedNames(previous: current, current: current).isEmpty)
+    }
+}
+
 final class StartupProxyRecoveryPolicyTests: XCTestCase {
     private func observation(
         wantsSystemProxy: Bool = true,

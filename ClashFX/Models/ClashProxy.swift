@@ -68,6 +68,172 @@ enum ClashProxyType: String, Codable, Hashable {
 typealias ClashProxyName = String
 typealias ClashProviderName = String
 
+struct ProxyMenuRefreshCoordinator {
+    enum Mode: Equatable {
+        case incremental
+        case rebuild
+    }
+
+    struct Ticket: Equatable {
+        let generation: Int
+        let mode: Mode
+    }
+
+    struct Completion {
+        let shouldApply: Bool
+        let nextTicket: Ticket?
+    }
+
+    private let minimumIncrementalInterval: TimeInterval
+    private var generation = 0
+    private var activeTicket: Ticket?
+    private var rebuildPending = false
+    private var lastAppliedCompletionDate: Date?
+
+    init(minimumIncrementalInterval: TimeInterval = 0.75) {
+        self.minimumIncrementalInterval = minimumIncrementalInterval
+    }
+
+    mutating func request(_ mode: Mode, now: Date = Date()) -> Ticket? {
+        if mode == .rebuild {
+            generation += 1
+            if activeTicket != nil {
+                rebuildPending = true
+                return nil
+            }
+            let ticket = Ticket(generation: generation, mode: .rebuild)
+            activeTicket = ticket
+            return ticket
+        }
+
+        guard activeTicket == nil else { return nil }
+        if let lastAppliedCompletionDate,
+           now.timeIntervalSince(lastAppliedCompletionDate) < minimumIncrementalInterval {
+            return nil
+        }
+        let ticket = Ticket(generation: generation, mode: .incremental)
+        activeTicket = ticket
+        return ticket
+    }
+
+    mutating func complete(_ ticket: Ticket, now: Date = Date()) -> Completion {
+        guard activeTicket == ticket else {
+            return Completion(shouldApply: false, nextTicket: nil)
+        }
+
+        activeTicket = nil
+        let shouldApply = ticket.generation == generation
+        if shouldApply {
+            lastAppliedCompletionDate = now
+        }
+
+        guard rebuildPending else {
+            return Completion(shouldApply: shouldApply, nextTicket: nil)
+        }
+        rebuildPending = false
+        let nextTicket = Ticket(generation: generation, mode: .rebuild)
+        activeTicket = nextTicket
+        return Completion(shouldApply: shouldApply, nextTicket: nextTicket)
+    }
+}
+
+struct ProxyMenuStructureSignature: Equatable {
+    struct Group: Equatable {
+        let name: ClashProxyName
+        let type: ClashProxyType
+        let members: [ClashProxyName]
+        let hidden: Bool
+        let testURL: String?
+        let expectedStatus: String?
+    }
+
+    struct ProviderAssignment: Equatable {
+        let proxyName: ClashProxyName
+        let providerName: ClashProviderName
+    }
+
+    let groups: [Group]
+    let providerAssignments: [ProviderAssignment]
+
+    init(snapshot: ClashProxyResp) {
+        groups = snapshot.proxyGroups.map {
+            Group(
+                name: $0.name,
+                type: $0.type,
+                members: $0.all ?? [],
+                hidden: $0.hidden ?? false,
+                testURL: $0.testUrl,
+                expectedStatus: $0.expectedStatus
+            )
+        }
+        providerAssignments = snapshot.proxiesMap.values.compactMap { proxy in
+            proxy.enclosingProvider.map {
+                ProviderAssignment(proxyName: proxy.name, providerName: $0.name)
+            }
+        }.sorted {
+            if $0.proxyName == $1.proxyName {
+                return $0.providerName < $1.providerName
+            }
+            return $0.proxyName < $1.proxyName
+        }
+    }
+}
+
+enum ProxyMenuSnapshotDelta {
+    private struct History: Equatable {
+        let time: Date
+        let delay: Int
+        let meanDelay: Int?
+    }
+
+    private struct ExtraState: Equatable {
+        let url: String
+        let alive: Bool
+        let history: History?
+    }
+
+    private struct Presentation: Equatable {
+        let now: ClashProxyName?
+        let alive: Bool?
+        let history: History?
+        let extra: [ExtraState]
+    }
+
+    static func affectedNames(previous: ClashProxyResp, current: ClashProxyResp) -> Set<ClashProxyName> {
+        var affected = Set(current.proxiesMap.compactMap { name, proxy -> ClashProxyName? in
+            guard let old = previous.proxiesMap[name] else { return name }
+            return presentation(for: old) == presentation(for: proxy) ? nil : name
+        })
+
+        var changed = true
+        while changed {
+            changed = false
+            for group in current.proxyGroups where !affected.contains(group.name) {
+                guard (group.all ?? []).contains(where: affected.contains) else { continue }
+                affected.insert(group.name)
+                changed = true
+            }
+        }
+        return affected
+    }
+
+    private static func presentation(for proxy: ClashProxy) -> Presentation {
+        let history = proxy.history.last.map {
+            History(time: $0.time, delay: $0.delay, meanDelay: $0.meanDelay)
+        }
+        let extra = (proxy.extra ?? [:]).map { url, state in
+            ExtraState(
+                url: url,
+                alive: state.alive,
+                history: state.history.last.map {
+                    History(time: $0.time, delay: $0.delay, meanDelay: $0.meanDelay)
+                }
+            )
+        }.sorted { $0.url < $1.url }
+        return Presentation(now: proxy.now, alive: proxy.alive, history: history, extra: extra)
+    }
+}
+
 enum ProxyBenchmarkRowState {
     case testing(displayName: String)
     case measured(displayName: String, delay: Int)

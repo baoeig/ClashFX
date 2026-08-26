@@ -12,53 +12,81 @@ import SwiftyJSON
 
 class MenuItemFactory {
     private static var cachedProxyData: ClashProxyResp?
+    private static var cachedStructureSignature: ProxyMenuStructureSignature?
+    private static var refreshCoordinator = ProxyMenuRefreshCoordinator()
 
     static let useViewToRenderProxy: Bool = AppDelegate.isAboveMacOS152
 
     // MARK: - Public
 
     static func refreshExistingMenuItems() {
-        ApiRequest.getMergedProxyData {
-            info in
-            guard let info, !info.proxiesMap.isEmpty else {
-                Logger.log(
-                    "Skipped proxy-menu refresh because no valid proxy snapshot is available",
-                    level: .warning
-                )
-                return
-            }
-            AutomaticGroupBenchmarkPresentationStore.prune(using: info)
-            SelectorBenchmarkPresentationStore.prune(using: info)
-            if info.proxiesMap.keys != cachedProxyData?.proxiesMap.keys {
-                cachedProxyData = info
-                refreshMenuItems(mergedData: info)
-                return
-            }
-
-            for proxy in info.proxies {
-                NotificationCenter.default.post(name: .proxyUpdate(for: proxy.name), object: proxy, userInfo: nil)
-            }
-        }
+        scheduleRefresh(.incremental)
     }
 
     static func recreateProxyMenuItems() {
         let recreate = {
             AutomaticGroupBenchmarkPresentationStore.clearAll()
             SelectorBenchmarkPresentationStore.clearAll()
-            ApiRequest.getMergedProxyData {
-                proxyInfo in
-                guard let proxyInfo, !proxyInfo.proxiesMap.isEmpty else {
-                    Logger.log(
-                        "Kept existing proxy menu because the refreshed snapshot is empty",
-                        level: .warning
-                    )
-                    return
-                }
-                cachedProxyData = proxyInfo
-                refreshMenuItems(mergedData: proxyInfo)
-            }
+            scheduleRefresh(.rebuild)
         }
         if Thread.isMainThread { recreate() } else { DispatchQueue.main.async(execute: recreate) }
+    }
+
+    private static func scheduleRefresh(_ mode: ProxyMenuRefreshCoordinator.Mode) {
+        let schedule = {
+            guard let ticket = refreshCoordinator.request(mode) else { return }
+            executeRefresh(ticket)
+        }
+        if Thread.isMainThread { schedule() } else { DispatchQueue.main.async(execute: schedule) }
+    }
+
+    private static func executeRefresh(_ ticket: ProxyMenuRefreshCoordinator.Ticket) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        ApiRequest.getMergedProxyData { info in
+            let completion = refreshCoordinator.complete(ticket)
+            if completion.shouldApply {
+                applyRefreshResult(info, mode: ticket.mode)
+            }
+            if let nextTicket = completion.nextTicket {
+                executeRefresh(nextTicket)
+            }
+        }
+    }
+
+    private static func applyRefreshResult(
+        _ info: ClashProxyResp?,
+        mode: ProxyMenuRefreshCoordinator.Mode
+    ) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        guard let info, !info.proxiesMap.isEmpty else {
+            Logger.log(
+                mode == .rebuild
+                    ? "Kept existing proxy menu because the refreshed snapshot is empty"
+                    : "Skipped proxy-menu refresh because no valid proxy snapshot is available",
+                level: .warning
+            )
+            return
+        }
+
+        AutomaticGroupBenchmarkPresentationStore.prune(using: info)
+        SelectorBenchmarkPresentationStore.prune(using: info)
+        let structure = ProxyMenuStructureSignature(snapshot: info)
+        let previous = cachedProxyData
+        let requiresRebuild = mode == .rebuild
+            || previous == nil
+            || structure != cachedStructureSignature
+
+        cachedProxyData = info
+        cachedStructureSignature = structure
+        guard !requiresRebuild, let previous else {
+            refreshMenuItems(mergedData: info)
+            return
+        }
+
+        for name in ProxyMenuSnapshotDelta.affectedNames(previous: previous, current: info).sorted() {
+            guard let proxy = info.proxiesMap[name] else { continue }
+            NotificationCenter.default.post(name: .proxyUpdate(for: name), object: proxy, userInfo: nil)
+        }
     }
 
     static func refreshMenuItems(mergedData proxyInfo: ClashProxyResp?) {
