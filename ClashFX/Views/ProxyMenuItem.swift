@@ -201,6 +201,9 @@ class ProxyMenuItem: NSMenuItem {
     ) {
         selectorBenchmarkPresentation = presentation
         presentationName = presentation.rowState.presentationName
+        toolTip = presentation.resolvedLeafName.flatMap {
+            $0 == proxyName ? nil : $0
+        }
         updatePresentation(
             name: presentationName,
             delay: presentation.rowState.delayDisplay,
@@ -233,6 +236,7 @@ class ProxyMenuItem: NSMenuItem {
 
         selectorBenchmarkPresentation = nil
         presentationName = proxyName
+        toolTip = nil
         guard let leaf = finalLeaf(from: info),
               let state = leaf.testState(for: parentBenchmarkURL),
               let history = state.history.last else {

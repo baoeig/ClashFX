@@ -292,11 +292,16 @@ struct SelectorBenchmarkPresentation {
     let benchmarkURL: String
     let sessionIdentifier: UUID
     let rowState: ProxyBenchmarkRowState
+    let publishedAt: Date = Date()
 
     func reconciled(
         with snapshot: ClashProxyResp,
         currentBenchmarkURL: String
     ) -> SelectorBenchmarkPresentation {
+        let maximumCacheAge: TimeInterval = 24 * 60 * 60
+        guard Date().timeIntervalSince(publishedAt) <= maximumCacheAge else {
+            return unavailable()
+        }
         let currentAutomaticBenchmarkURL = snapshot.proxiesMap[rowName]
             .flatMap { $0.type.isAutoGroup ? $0.effectiveBenchmarkURL(fallback: currentBenchmarkURL) : nil }
         guard benchmarkURL == currentBenchmarkURL
@@ -472,7 +477,8 @@ final class AdaptiveAsyncTaskRunner {
     private var policy: SelectorBenchmarkConcurrencyPolicy
     private var nextTaskIndex = 0
     private var activeTaskCount = 0
-    private var cohortOutcomes = [Bool]()
+    private var decisionOutcomes = [Bool]()
+    private var decisionWindowSize: Int
     private var completion: (() -> Void)?
 
     init(tasks: [Task],
@@ -481,6 +487,7 @@ final class AdaptiveAsyncTaskRunner {
         self.tasks = tasks
         self.policy = policy
         self.limitChanged = limitChanged
+        decisionWindowSize = policy.currentLimit
     }
 
     func start(completion: @escaping () -> Void) {
@@ -491,9 +498,7 @@ final class AdaptiveAsyncTaskRunner {
     }
 
     private func scheduleAvailableTasks() {
-        guard activeTaskCount == 0 else { return }
-
-        if nextTaskIndex == tasks.count {
+        if nextTaskIndex == tasks.count, activeTaskCount == 0 {
             let completion = completion
             self.completion = nil
             DispatchQueue.main.async {
@@ -502,9 +507,10 @@ final class AdaptiveAsyncTaskRunner {
             return
         }
 
-        cohortOutcomes.removeAll(keepingCapacity: true)
-        let cohortEndIndex = min(tasks.count, nextTaskIndex + policy.currentLimit)
-        while nextTaskIndex < cohortEndIndex {
+        // Replenish the pool whenever a request settles. Concurrency decisions
+        // still use complete observation windows, but slow requests no longer
+        // hold every later target behind a cohort barrier.
+        while nextTaskIndex < tasks.count, activeTaskCount < policy.currentLimit {
             let task = tasks[nextTaskIndex]
             nextTaskIndex += 1
             activeTaskCount += 1
@@ -512,12 +518,15 @@ final class AdaptiveAsyncTaskRunner {
             task { succeeded in
                 self.stateQueue.async {
                     self.activeTaskCount -= 1
-                    self.cohortOutcomes.append(succeeded)
-                    guard self.activeTaskCount == 0 else { return }
-                    let previousLimit = self.policy.currentLimit
-                    self.policy.recordCohort(self.cohortOutcomes)
-                    if self.policy.currentLimit != previousLimit {
-                        self.limitChanged?(previousLimit, self.policy.currentLimit)
+                    self.decisionOutcomes.append(succeeded)
+                    if self.decisionOutcomes.count >= self.decisionWindowSize {
+                        let previousLimit = self.policy.currentLimit
+                        self.policy.recordCohort(self.decisionOutcomes)
+                        self.decisionOutcomes.removeAll(keepingCapacity: true)
+                        self.decisionWindowSize = self.policy.currentLimit
+                        if self.policy.currentLimit != previousLimit {
+                            self.limitChanged?(previousLimit, self.policy.currentLimit)
+                        }
                     }
                     self.scheduleAvailableTasks()
                 }

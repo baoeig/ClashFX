@@ -9,6 +9,41 @@
 import Carbon
 import Cocoa
 
+private final class SelectorBenchmarkPresentationCoalescer {
+    private struct Key: Hashable {
+        let selectorName: ClashProxyName
+        let rowName: ClashProxyName
+    }
+
+    private var pending = [Key: SelectorBenchmarkPresentation]()
+    private var flushWorkItem: DispatchWorkItem?
+    private let delay: TimeInterval = 0.15
+
+    func enqueue(_ presentation: SelectorBenchmarkPresentation) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        let key = Key(
+            selectorName: presentation.selectorName,
+            rowName: presentation.rowName
+        )
+        pending[key] = presentation
+        guard flushWorkItem == nil else { return }
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.flush()
+        }
+        flushWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    func flush() {
+        dispatchPrecondition(condition: .onQueue(.main))
+        flushWorkItem?.cancel()
+        flushWorkItem = nil
+        let presentations = pending.values
+        pending.removeAll(keepingCapacity: true)
+        presentations.forEach(SelectorBenchmarkPresentationStore.publish)
+    }
+}
+
 class ProxyGroupSpeedTestMenuItem: NSMenuItem {
     let proxyGroup: ClashProxy
     let testType: TestType
@@ -262,6 +297,7 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
         var pendingRows = Set<ClashProxyName>()
         var selectorBenchmarkURL = Settings.benchMarkUrl
         let sessionIdentifier = UUID()
+        let presentationCoalescer = SelectorBenchmarkPresentationCoalescer()
         let publishState: (SelectorBenchmarkRow, ProxyBenchmarkRowState) -> Void = { row, state in
             SelectorBenchmarkPresentationStore.publish(
                 SelectorBenchmarkPresentation(
@@ -302,7 +338,16 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                     let state: ProxyBenchmarkRowState = delay == 0
                         ? .failed(displayName: row.displayName)
                         : .measured(displayName: row.displayName, delay: delay)
-                    publishState(row, state)
+                    presentationCoalescer.enqueue(
+                        SelectorBenchmarkPresentation(
+                            selectorName: group.name,
+                            rowName: row.rowName,
+                            resolvedLeafName: row.measurementKey?.proxyName,
+                            benchmarkURL: row.measurementKey?.benchmarkURL ?? selectorBenchmarkURL,
+                            sessionIdentifier: sessionIdentifier,
+                            rowState: state
+                        )
+                    )
                 }
             }
         }
@@ -312,6 +357,7 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
             DispatchQueue.main.async {
                 guard !didFinish else { return }
                 didFinish = true
+                presentationCoalescer.flush()
                 if AppDelegate.shared.isActiveBenchmarkSession(session) {
                     AppDelegate.shared.finishSpeedTest(
                         session: session,
@@ -378,11 +424,10 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                                 candidateDelays: result.candidateDelays,
                                 snapshot: snapshot
                             )
-                            let displayName: String = {
-                                guard let leaf = retestSnapshot.finalLeaf,
-                                      leaf != target.groupName else { return target.groupName }
-                                return "\(target.groupName) → \(leaf)"
-                            }()
+                            // Keep the menu row width and identity stable. The
+                            // authoritative final leaf is retained separately in
+                            // the presentation and exposed as the item's tooltip.
+                            let displayName = target.groupName
                             let state: ProxyBenchmarkRowState
                             switch retestSnapshot.evidence {
                             case let .measured(delay):
@@ -448,12 +493,15 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                         : row.rowName
                 })
                 session.onTermination {
-                    guard session.isCancelled,
-                          AppDelegate.shared.isActiveBenchmarkSession(session) else {
-                        return
-                    }
-                    for row in plan.orderedRows where pendingRows.remove(row.rowName) != nil {
-                        publishState(row, .unavailable(displayName: row.displayName))
+                    DispatchQueue.main.async {
+                        guard session.isCancelled,
+                              AppDelegate.shared.isActiveBenchmarkSession(session) else {
+                            return
+                        }
+                        for row in plan.orderedRows where pendingRows.remove(row.rowName) != nil {
+                            publishState(row, .unavailable(displayName: row.displayName))
+                        }
+                        presentationCoalescer.flush()
                     }
                 }
                 for row in plan.orderedRows {

@@ -988,7 +988,6 @@ class ApiRequest {
 
         let resultQueue = DispatchQueue(label: "com.clashfx.selectorBenchmarkResults")
         var firstPassDelays = [SelectorBenchmarkMeasurementKey: Int]()
-        var retryDelays = [SelectorBenchmarkMeasurementKey: Int]()
 
         let runTarget: (SelectorBenchmarkPlan.Target, @escaping (Int) -> Void) -> Void = { target, done in
             guard !session.isCancelled else {
@@ -1031,6 +1030,12 @@ class ApiRequest {
                     resultQueue.sync {
                         firstPassDelays[target.key] = delay
                     }
+                    // Successful rows are final and can be shown immediately.
+                    // Failures remain in the testing state until their one retry
+                    // settles, avoiding a distracting fail/success flicker.
+                    if delay > 0, !session.isCancelled {
+                        result(target, delay)
+                    }
                     done(delay > 0)
                 }
             }
@@ -1064,10 +1069,6 @@ class ApiRequest {
                 retryPolicy.retryTargets(from: plan.targets, firstPassDelays: firstPassDelays)
             }
             guard !retryTargets.isEmpty else {
-                let finalDelays = resultQueue.sync { firstPassDelays }
-                for target in plan.targets {
-                    result(target, finalDelays[target.key] ?? 0)
-                }
                 completion()
                 return
             }
@@ -1079,8 +1080,8 @@ class ApiRequest {
             let retryTasks: [LimitedAsyncTaskRunner.Task] = retryTargets.map { target in
                 return { done in
                     runTarget(target) { delay in
-                        resultQueue.sync {
-                            retryDelays[target.key] = delay
+                        if !session.isCancelled {
+                            result(target, delay)
                         }
                         done()
                     }
@@ -1094,17 +1095,6 @@ class ApiRequest {
                 guard !session.isCancelled else {
                     completion()
                     return
-                }
-                let delays = resultQueue.sync { (firstPassDelays, retryDelays) }
-                for target in plan.targets {
-                    result(
-                        target,
-                        retryPolicy.finalDelay(
-                            for: target,
-                            firstPassDelays: delays.0,
-                            retryDelays: delays.1
-                        )
-                    )
                 }
                 completion()
             }

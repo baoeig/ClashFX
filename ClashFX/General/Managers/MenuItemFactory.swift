@@ -26,7 +26,9 @@ class MenuItemFactory {
     static func recreateProxyMenuItems() {
         let recreate = {
             AutomaticGroupBenchmarkPresentationStore.clearAll()
-            SelectorBenchmarkPresentationStore.clearAll()
+            // Selector presentations reconcile against the new snapshot and are
+            // pruned below. Clearing them here made valid results disappear on
+            // no-op config reloads and menu reconstruction.
             scheduleRefresh(.rebuild)
         }
         if Thread.isMainThread { recreate() } else { DispatchQueue.main.async(execute: recreate) }

@@ -661,11 +661,11 @@ final class BenchmarkRegressionTests: XCTestCase {
         )
     }
 
-    func testAdaptiveRunnerWaitsForWholeCohortBeforeRamping() {
+    func testAdaptiveRunnerContinuouslyReplenishesBeforeSlowRequestFinishes() {
         let firstCohortStarted = expectation(description: "first cohort started")
         firstCohortStarted.expectedFulfillmentCount = 8
-        let secondCohortStarted = expectation(description: "second cohort started")
-        secondCohortStarted.expectedFulfillmentCount = 12
+        let replacementTasksStarted = expectation(description: "replacement tasks started")
+        replacementTasksStarted.expectedFulfillmentCount = 7
         let partialCohortSettled = expectation(description: "partial cohort settled")
         let completed = expectation(description: "runner completes")
         let lock = NSLock()
@@ -683,7 +683,9 @@ final class BenchmarkRegressionTests: XCTestCase {
                     lock.unlock()
                     firstCohortStarted.fulfill()
                 } else {
-                    secondCohortStarted.fulfill()
+                    if index < 15 {
+                        replacementTasksStarted.fulfill()
+                    }
                     done(true)
                 }
             }
@@ -709,9 +711,9 @@ final class BenchmarkRegressionTests: XCTestCase {
         lock.lock()
         let partialStartedTaskCount = startedTaskCount
         lock.unlock()
-        XCTAssertEqual(partialStartedTaskCount, 8)
+        XCTAssertEqual(partialStartedTaskCount, 20)
         completions.last?(true)
-        wait(for: [secondCohortStarted, completed], timeout: 2)
+        wait(for: [replacementTasksStarted, completed], timeout: 2)
     }
 
     func testSelectorRetryPolicyRetriesOnlyFailuresOnceAndUsesRetryResult() throws {
@@ -903,7 +905,7 @@ final class BenchmarkRegressionTests: XCTestCase {
             resolvedLeafName: "Leaf",
             benchmarkURL: "https://automatic.example.test",
             sessionIdentifier: UUID(),
-            rowState: .measured(displayName: "Automatic → Leaf", delay: 210)
+            rowState: .measured(displayName: "Automatic", delay: 210)
         )
 
         XCTAssertEqual(
