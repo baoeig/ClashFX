@@ -323,7 +323,7 @@ private final class ClashFXShortcutRecorder: NSButton {
         let modifiers = event.modifierFlags.intersection([
             .command, .control, .option, .shift
         ])
-        guard !modifiers.isEmpty,
+        guard (!modifiers.isEmpty || event.specialKey?.isFunctionKey == true),
               let shortcut = KeyboardShortcuts.Shortcut(event: event) else {
             NSSound.beep()
             return nil

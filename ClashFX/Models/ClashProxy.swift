@@ -292,7 +292,25 @@ struct SelectorBenchmarkPresentation {
     let benchmarkURL: String
     let sessionIdentifier: UUID
     let rowState: ProxyBenchmarkRowState
-    let publishedAt: Date = Date()
+    let publishedAt: Date
+
+    init(
+        selectorName: ClashProxyName,
+        rowName: ClashProxyName,
+        resolvedLeafName: ClashProxyName?,
+        benchmarkURL: String,
+        sessionIdentifier: UUID,
+        rowState: ProxyBenchmarkRowState,
+        publishedAt: Date = .init()
+    ) {
+        self.selectorName = selectorName
+        self.rowName = rowName
+        self.resolvedLeafName = resolvedLeafName
+        self.benchmarkURL = benchmarkURL
+        self.sessionIdentifier = sessionIdentifier
+        self.rowState = rowState
+        self.publishedAt = publishedAt
+    }
 
     func reconciled(
         with snapshot: ClashProxyResp,
@@ -329,7 +347,8 @@ struct SelectorBenchmarkPresentation {
                 resolvedLeafName: resolvedLeafName,
                 benchmarkURL: benchmarkURL,
                 sessionIdentifier: sessionIdentifier,
-                rowState: .unavailable(displayName: rowName)
+                rowState: .unavailable(displayName: rowName),
+                publishedAt: publishedAt
             )
         }
     }

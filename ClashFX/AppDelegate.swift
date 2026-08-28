@@ -409,8 +409,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             cleanupEnhancedModeForTermination {}
         }
         if !isRestarting,
-           NetworkChangeNotifier.isCurrentSystemSetToClash(looser: true) ||
-           NetworkChangeNotifier.hasInterfaceProxySetToClash() {
+           (NetworkChangeNotifier.isCurrentSystemSetToClash(looser: true) ||
+               NetworkChangeNotifier.hasInterfaceProxySetToClash()) {
             Logger.log("Need Reset Proxy Setting again", level: .error)
             SystemProxyManager.shared.disableProxy()
         }
@@ -2141,7 +2141,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self.recordWakeRecoveryBreadcrumb(
                         "generation \(generation) recovery triggered: \(reason)"
                     )
-                    self.restoreCoreAfterWake()
+                    self.restoreCoreAfterWake(generation: generation)
                     return
                 }
 
@@ -2219,7 +2219,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func restoreCoreAfterWake() {
+    private func restoreCoreAfterWake(generation: Int) {
+        guard generation == wakeRecoveryGeneration else { return }
         if Settings.enhancedMode || ConfigManager.shared.isEnhancedModeActive {
             Logger.log("Wake recovery: stopping and rebuilding Enhanced Mode")
             captureAndRestartEnhancedMode(
@@ -2231,6 +2232,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Logger.log("Wake recovery: restarting built-in core")
         ConfigManager.shared.isRunning = false
         updateConfig(showNotification: false) { [weak self] error in
+            guard let self = self,
+                  generation == self.wakeRecoveryGeneration else { return }
             if let error = error {
                 Logger.log("Wake recovery: built-in core restore failed: \(error)", level: .error)
                 return
@@ -2240,7 +2243,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                !ConfigManager.shared.isProxySetByOtherVariable.value {
                 SystemProxyManager.shared.enableProxy()
             }
-            self?.resetStreamApi()
+            self.resetStreamApi()
         }
     }
 
@@ -4055,6 +4058,7 @@ extension AppDelegate {
         isRestarting = true
         let path = Bundle.main.bundlePath
         let processIdentifier = ProcessInfo.processInfo.processIdentifier
+        let wasEnhancedModeActive = ConfigManager.shared.isEnhancedModeActive
 
         if let item = statusItem, item.menu != nil {
             let restartingMenu = NSMenu()
@@ -4096,6 +4100,11 @@ extension AppDelegate {
                 clashResumeCallbacks()
                 _ = clashResumeCore()
                 self.statusItem.menu = self.statusMenu
+                if wasEnhancedModeActive, Settings.enhancedMode {
+                    self.restoreEnhancedMode(
+                        attemptsLeft: Self.enhancedModeRestoreMaxAttempts
+                    )
+                }
                 NSAlert.alert(with: error.localizedDescription)
             }
         }

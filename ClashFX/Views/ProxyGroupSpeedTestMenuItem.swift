@@ -38,7 +38,7 @@ private final class SelectorBenchmarkPresentationCoalescer {
         dispatchPrecondition(condition: .onQueue(.main))
         flushWorkItem?.cancel()
         flushWorkItem = nil
-        let presentations = pending.values
+        let presentations = Array(pending.values)
         pending.removeAll(keepingCapacity: true)
         presentations.forEach(SelectorBenchmarkPresentationStore.publish)
     }
