@@ -1,18 +1,20 @@
 ### Bug Fixes
 
-- **Large Menus Stay Responsive While Opening or Switching Configurations** — Proxy snapshots are decoded away from the main thread, overlapping refreshes are coalesced, and nested proxy rows are created only when their submenu opens. This removes repeated full-menu construction from the critical path while preserving current selections and live delay updates. (#216)
-- **Subscription Information No Longer Widens the Entire Menu** — The top subscription row now bounds each line by rendered width and keeps the complete name and quota details in its tooltip. It remains enabled by default and can be hidden entirely from Settings → Appearance → Tray Menu → Show Subscription Information. (#215)
-- **Selector Benchmarks Avoid Ordered Connection Bursts** — Visible rows keep their subscription order, while background requests are interleaved across protocol/provider cohorts and concurrency changes wait for each cohort to finish. First-pass failures receive one conservative retry before a single final result is shown, reducing transient bulk failures without flashing stale states. (#147)
-- **The Selected Automatic Group Re-evaluates After Leaf Tests** — When a Selector currently uses an automatic group, that row stays in testing until the leaf pass completes. ClashFX then retests that group once with its configured settings and displays Mihomo's fresh final `now` path; other automatic rows remain measurement-only, and ClashFX never substitutes its own lowest-latency choice. (#147)
+- **Large Selector Benchmarks Stream Results Without Connection Bursts** — A continuously replenished, bounded request pool now publishes successful rows as soon as they finish instead of waiting for a whole batch or the complete test. Only first-pass failures receive one conservative retry, so large nested groups finish sooner and no longer appear frozen for roughly 50 seconds. (#147, #219)
+- **Delay Results Remain Useful Without Distorting Automatic Groups** — Recent measurements survive menu reconstruction and remain visible after reopening the menu; older results fade before expiring. Automatic rows keep stable names, expose the final leaf separately, and use Mihomo's fresh `now` after an explicit group retest rather than inventing a UI-side selection. (#147, #219)
+- **Sleep/Wake Recovery Is Bounded, Generation-Safe, and Diagnosable** — Delayed callbacks from an earlier wake can no longer keep the menu in a loading state or overwrite a newer recovery. Wake checks use bounded backoff, preserve failure evidence, and add a lightweight diagnostic breadcrumb/watchdog without taking destructive action in the background. (#147, #210)
+- **Restart and Settings State Stay Stable** — Self-restart waits for the old process to exit before launching its replacement, preserves Enhanced Mode on helper failure, and gives the status item a persistent identity so its menu-bar position is retained. Configured proxy ports are no longer replaced by runtime auto-port values, automatic ports are explained in place, and Settings group titles no longer clip. (#219)
+- **Custom Shortcuts Distinguish Real Duplicates From Warnings** — Shortcuts already assigned inside ClashFX remain blocked, while menu or common system conflicts such as Command-E are shown as warnings and can still be accepted. Function keys remain available without modifiers, and failed registrations roll back cleanly. (#218)
 
 ---
 
 ### 修复
 
-- **打开大菜单或切换配置时保持流畅** — 代理快照改为在主线程外解析，重叠刷新会自动合并，嵌套节点也只在对应子菜单真正展开时创建，从关键路径中移除了重复的完整菜单构建，同时保留当前选择和实时延迟更新。 (#216)
-- **订阅信息不再撑宽整个菜单** — 顶部订阅信息的每一行现在按实际显示宽度限制，完整订阅名称和流量信息仍可通过悬停提示查看。该信息默认显示，也可以在“设置 → 外观 → 菜单栏菜单 → 显示订阅信息”中完整关闭。 (#215)
-- **Selector 测速会避免按订阅顺序集中冲击同类连接** — 菜单中的节点顺序保持不变，后台请求则按协议和 Provider 分组交错执行，并在当前批次全部完成后才调整并发。首轮失败项只会再进行一次保守低并发复测，界面最终只发布一次结果，从而减少瞬时大面积失败和状态闪烁。 (#147)
-- **当前选中的自动策略会在节点测速后重新判断** — 当 Selector 正在使用自动策略组时，该行会保持“测速中”，直到节点测速完成；随后 ClashFX 使用该组自己的设置重测一次，并显示 Mihomo 最新的 `now` 最终路径。其他自动策略行仍只做测量，ClashFX 不会自行用最低延迟替代核心选择。 (#147)
+- **大型 Selector 测速会持续返回结果，同时避免连接突发** — 测速现在使用持续补充任务的有界请求池，成功节点完成后立即显示，不必等待整批或全部测试结束；只有首轮失败项会进行一次保守低并发复测。大型嵌套策略组可以更快给出可用结果，不再表现为约 50 秒一直卡住。 (#147, #219)
+- **测速结果可以持续查看，也不会扭曲自动策略** — 最近的测速结果会在菜单重建后继续保留，再次打开菜单仍可查看；较旧结果会先弱化显示，再按时过期。自动策略行保持稳定名称，最终节点通过独立提示展示；只有明确重测该组时才采用 Mihomo 最新的 `now`，界面不会自行发明选择结果。 (#147, #219)
+- **睡眠唤醒恢复现在有界、可防旧回调且便于诊断** — 上一次唤醒流程的延迟回调不会再让菜单一直停留在加载状态，也不能覆盖更新一轮恢复结果。唤醒检查采用有界退避，保留失败证据，并记录轻量诊断线索和非破坏性后台看门狗。 (#147, #210)
+- **重启与设置状态保持稳定** — 自重启会先等待旧进程完全退出，再启动新进程；Helper 失败时会恢复增强模式。状态栏项目使用持久身份，因此重启后位置可以保留。配置端口不会再被自动分配的运行时端口覆盖；自动端口会在原位置说明，设置分组标题也不再被截断。 (#219)
+- **自定义快捷键会区分真正重复与可接受警告** — ClashFX 内部已分配的快捷键仍会被阻止；菜单或常见系统冲突（例如 Command-E）改为警告，用户确认后仍可使用。无需修饰键的功能键继续可用，注册失败也会完整回滚。 (#218)
 
 <!-- Previous release notes -->
 
