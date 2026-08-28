@@ -1208,4 +1208,55 @@ final class StartupProxyRecoveryPolicyTests: XCTestCase {
             .verifyAndApply
         )
     }
+
+    func testInconclusiveDataPlaneProbePreservesFailureEvidence() {
+        XCTAssertEqual(
+            RuntimeDataPlaneFailurePolicy.nextFailureCount(
+                current: 2,
+                outcome: .baselineUnavailable
+            ),
+            2
+        )
+        XCTAssertEqual(
+            RuntimeDataPlaneFailurePolicy.nextFailureCount(
+                current: 2,
+                outcome: .healthy
+            ),
+            0
+        )
+        XCTAssertEqual(
+            RuntimeDataPlaneFailurePolicy.nextFailureCount(
+                current: 2,
+                outcome: .confirmedCoreFailure
+            ),
+            3
+        )
+    }
+
+    func testWakeRetryBackoffIsBounded() {
+        XCTAssertEqual(
+            WakeRecoveryRetryPolicy.delay(
+                baseDelay: 2,
+                maximumAttempts: 3,
+                attemptsLeft: 3
+            ),
+            2
+        )
+        XCTAssertEqual(
+            WakeRecoveryRetryPolicy.delay(
+                baseDelay: 2,
+                maximumAttempts: 3,
+                attemptsLeft: 2
+            ),
+            4
+        )
+        XCTAssertEqual(
+            WakeRecoveryRetryPolicy.delay(
+                baseDelay: 2,
+                maximumAttempts: 9,
+                attemptsLeft: 1
+            ),
+            8
+        )
+    }
 }

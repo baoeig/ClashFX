@@ -44,3 +44,38 @@ enum StartupProxyRecoveryPolicy {
         return .verifyAndApply
     }
 }
+
+enum RuntimeDataPlaneProbeOutcome {
+    case healthy
+    case confirmedCoreFailure
+    case baselineUnavailable
+}
+
+enum RuntimeDataPlaneFailurePolicy {
+    static func nextFailureCount(
+        current: Int,
+        outcome: RuntimeDataPlaneProbeOutcome
+    ) -> Int {
+        switch outcome {
+        case .healthy:
+            return 0
+        case .confirmedCoreFailure:
+            return current + 1
+        case .baselineUnavailable:
+            // An unavailable independent baseline is inconclusive. Preserve the
+            // prior evidence but neither forgive it nor count a new failure.
+            return current
+        }
+    }
+}
+
+enum WakeRecoveryRetryPolicy {
+    static func delay(
+        baseDelay: TimeInterval,
+        maximumAttempts: Int,
+        attemptsLeft: Int
+    ) -> TimeInterval {
+        let completedAttempts = max(0, maximumAttempts - attemptsLeft)
+        return min(baseDelay * pow(2, Double(completedAttempts)), 8)
+    }
+}

@@ -146,6 +146,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingStartupProxyRecoveryWork: DispatchWorkItem?
     private var pendingProxyBypassReloadWork: DispatchWorkItem?
     private var startupProxyRecoveryGeneration = 0
+    private var wakeRecoveryGeneration = 0
+    private let wakeRecoveryBreadcrumbLock = NSLock()
+    private var wakeRecoveryBreadcrumbToken = 0
+    private var wakeRecoveryBreadcrumb = "idle"
     private var startupProxyRecoveryDeadline = Date.distantPast
     private var isStartupProxyRecoveryActive = false
     private var isStartupProxyRecoveryHealthCheckInFlight = false
@@ -162,6 +166,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastEnhancedModeDataPlaneRecoveryTime = Date.distantPast
     private var isEnhancedModeRuntimeRecoveryPending = false
     private(set) var enhancedModeRuntimeHealthSummary = "not checked"
+    private(set) var wakeRecoveryDiagnosticSummary = "idle"
     private var lastCoreLogRecoveryTime = Date.distantPast
     private var didCompleteStaleEnhancedCoreCleanup = false
     private var didRestartHelperDuringEnhancedLaunch = false
@@ -391,6 +396,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pendingStartupProxyRecoveryWork?.cancel()
         pendingStartupProxyRecoveryWork = nil
         isStartupProxyRecoveryActive = false
+        pendingWakeRecoveryWork?.cancel()
+        pendingWakeRecoveryWork = nil
+        wakeRecoveryGeneration += 1
         enhancedModeHealthTimer?.invalidate()
         enhancedModeHealthTimer = nil
         // Fallback: TerminalCleanUpAction.run() already handles Enhanced Mode cleanup
@@ -1543,6 +1551,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func resetProxySettingOnWakeupFromSleep() {
         Logger.log("Wake recovery: didWake received")
+        recordWakeRecoveryBreadcrumb("didWake received", expectsProgressWithin: Self.wakeRecoveryDelay + 2)
 
         if !ApiRequest.useDirectApi() {
             resetStreamApi()
@@ -1568,8 +1577,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func scheduleWakeRecovery() {
         pendingWakeRecoveryWork?.cancel()
+        wakeRecoveryGeneration += 1
+        let generation = wakeRecoveryGeneration
+        recordWakeRecoveryBreadcrumb(
+            "generation \(generation) scheduled",
+            expectsProgressWithin: Self.wakeRecoveryDelay + 2
+        )
         let work = DispatchWorkItem { [weak self] in
-            self?.recoverProxyAfterWake(attemptsLeft: Self.wakeRecoveryMaxAttempts)
+            self?.recoverProxyAfterWake(
+                generation: generation,
+                attemptsLeft: Self.wakeRecoveryMaxAttempts
+            )
         }
         pendingWakeRecoveryWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.wakeRecoveryDelay, execute: work)
@@ -1911,18 +1929,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     "Enhanced Mode data plane recovered (DIRECT \(delay) ms)"
                 )
             }
-            consecutiveEnhancedModeDataPlaneFailures = 0
+            consecutiveEnhancedModeDataPlaneFailures = RuntimeDataPlaneFailurePolicy.nextFailureCount(
+                current: consecutiveEnhancedModeDataPlaneFailures,
+                outcome: .healthy
+            )
             enhancedModeRuntimeHealthSummary = "healthy (DIRECT \(delay) ms)"
 
         case let .networkUnavailable(coreReason, directReason):
-            if consecutiveEnhancedModeDataPlaneFailures > 0 {
+            let preservedFailures = RuntimeDataPlaneFailurePolicy.nextFailureCount(
+                current: consecutiveEnhancedModeDataPlaneFailures,
+                outcome: .baselineUnavailable
+            )
+            if preservedFailures > 0 {
                 Logger.log(
                     "Enhanced Mode data-plane result is inconclusive because the " +
-                        "system direct baseline also failed; clearing failure streak",
+                        "system direct baseline also failed; preserving prior failure evidence",
                     level: .warning
                 )
             }
-            consecutiveEnhancedModeDataPlaneFailures = 0
+            consecutiveEnhancedModeDataPlaneFailures = preservedFailures
             enhancedModeRuntimeHealthSummary =
                 "inconclusive (system direct baseline unavailable)"
             Logger.log(
@@ -1932,7 +1957,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
 
         case let .coreUnavailable(reason):
-            consecutiveEnhancedModeDataPlaneFailures += 1
+            consecutiveEnhancedModeDataPlaneFailures = RuntimeDataPlaneFailurePolicy.nextFailureCount(
+                current: consecutiveEnhancedModeDataPlaneFailures,
+                outcome: .confirmedCoreFailure
+            )
             let failures = consecutiveEnhancedModeDataPlaneFailures
             enhancedModeRuntimeHealthSummary =
                 "failed \(failures)/\(Self.enhancedModeDataPlaneFailureThreshold) " +
@@ -2052,51 +2080,119 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func recoverProxyAfterWake(attemptsLeft: Int) {
+    private func recoverProxyAfterWake(generation: Int, attemptsLeft: Int) {
+        guard generation == wakeRecoveryGeneration else {
+            Logger.log(
+                "Wake recovery: ignored obsolete generation \(generation)",
+                level: .debug
+            )
+            return
+        }
+        recordWakeRecoveryBreadcrumb(
+            "generation \(generation) probing with \(attemptsLeft) attempt(s) left",
+            expectsProgressWithin: Self.enhancedModeHealthRequestTimeout + 2
+        )
         guard !isWakeEnhancedModeRestarting else {
             Logger.log("Wake recovery: Enhanced Mode rebuild already in progress", level: .debug)
+            recordWakeRecoveryBreadcrumb(
+                "generation \(generation) deferred to Enhanced Mode rebuild"
+            )
             return
         }
 
         guard NetworkChangeNotifier.getPrimaryInterface() != nil else {
             guard attemptsLeft > 1 else {
                 Logger.log("Wake recovery: primary interface never became ready", level: .error)
+                recordWakeRecoveryBreadcrumb(
+                    "generation \(generation) ended: primary interface unavailable"
+                )
                 return
             }
             Logger.log("Wake recovery: waiting for primary interface (\(attemptsLeft - 1) retries left)", level: .warning)
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.wakeRecoveryRetryDelay) { [weak self] in
-                self?.recoverProxyAfterWake(attemptsLeft: attemptsLeft - 1)
+            let retryDelay = WakeRecoveryRetryPolicy.delay(
+                baseDelay: Self.wakeRecoveryRetryDelay,
+                maximumAttempts: Self.wakeRecoveryMaxAttempts,
+                attemptsLeft: attemptsLeft
+            )
+            let work = DispatchWorkItem { [weak self] in
+                self?.recoverProxyAfterWake(
+                    generation: generation,
+                    attemptsLeft: attemptsLeft - 1
+                )
             }
+            pendingWakeRecoveryWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + retryDelay, execute: work)
             return
         }
 
         checkCoreHealthAfterWake { [weak self] health in
-            guard let self = self else { return }
+            guard let self = self,
+                  generation == self.wakeRecoveryGeneration else { return }
             switch health {
             case .healthy:
                 Logger.log("Wake recovery: core API is healthy")
+                self.recordWakeRecoveryBreadcrumb("generation \(generation) healthy")
                 self.finishHealthyWakeRecovery()
             case let .unhealthy(reason):
                 guard attemptsLeft > 1 else {
                     Logger.log("Wake recovery: \(reason); restoring active proxy mode", level: .error)
+                    self.recordWakeRecoveryBreadcrumb(
+                        "generation \(generation) recovery triggered: \(reason)"
+                    )
                     self.restoreCoreAfterWake()
                     return
                 }
 
+                let retryDelay = WakeRecoveryRetryPolicy.delay(
+                    baseDelay: Self.wakeRecoveryRetryDelay,
+                    maximumAttempts: Self.wakeRecoveryMaxAttempts,
+                    attemptsLeft: attemptsLeft
+                )
                 Logger.log(
-                    "Wake recovery: \(reason); retrying in \(Self.wakeRecoveryRetryDelay)s " +
+                    "Wake recovery: \(reason); retrying in \(retryDelay)s " +
                         "(\(attemptsLeft - 1) retries left)",
                     level: .warning
                 )
                 let work = DispatchWorkItem { [weak self] in
-                    self?.recoverProxyAfterWake(attemptsLeft: attemptsLeft - 1)
+                    self?.recoverProxyAfterWake(
+                        generation: generation,
+                        attemptsLeft: attemptsLeft - 1
+                    )
                 }
                 self.pendingWakeRecoveryWork = work
                 DispatchQueue.main.asyncAfter(
-                    deadline: .now() + Self.wakeRecoveryRetryDelay,
+                    deadline: .now() + retryDelay,
                     execute: work
                 )
             }
+        }
+    }
+
+    private func recordWakeRecoveryBreadcrumb(
+        _ stage: String,
+        expectsProgressWithin timeout: TimeInterval? = nil
+    ) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        wakeRecoveryBreadcrumbLock.lock()
+        wakeRecoveryBreadcrumbToken += 1
+        let token = wakeRecoveryBreadcrumbToken
+        wakeRecoveryBreadcrumb = stage
+        wakeRecoveryDiagnosticSummary = stage
+        wakeRecoveryBreadcrumbLock.unlock()
+        Logger.log("Wake recovery breadcrumb: \(stage)", level: .debug)
+
+        guard let timeout else { return }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) { [weak self] in
+            guard let self = self else { return }
+            self.wakeRecoveryBreadcrumbLock.lock()
+            let hasNotAdvanced = self.wakeRecoveryBreadcrumbToken == token
+            let currentStage = self.wakeRecoveryBreadcrumb
+            self.wakeRecoveryBreadcrumbLock.unlock()
+            guard hasNotAdvanced else { return }
+            Logger.log(
+                "Wake recovery watchdog: main-queue stage has not advanced from '\(currentStage)' for \(timeout)s",
+                level: .warning
+            )
         }
     }
 
