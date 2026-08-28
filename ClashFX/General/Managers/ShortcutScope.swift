@@ -38,4 +38,22 @@ enum ShortcutRegistrationPolicy {
     ) -> Bool {
         shouldRegisterGlobally(.action, scope: scope) && !isMenuTracking
     }
+
+    static func duplicateOwner(
+        command: String,
+        proposedSignature: String?,
+        assignments: [String: String]
+    ) -> String? {
+        guard let proposedSignature else { return nil }
+        return assignments.first {
+            $0.key != command && $0.value == proposedSignature
+        }?.key
+    }
+
+    static func shouldWarnBeforeOverride(
+        matchesMainMenu: Bool,
+        isKnownSystemShortcut: Bool
+    ) -> Bool {
+        matchesMainMenu || isKnownSystemShortcut
+    }
 }

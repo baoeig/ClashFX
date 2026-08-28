@@ -41,7 +41,7 @@ enum KeyboardShortCutManager {
     private static let unsafeCommandShortcutMigrationKey = "kUnsafeCommandShortcutMigrationV1"
     private static let defaultProxyModeShortcutMigrationKey =
         "kDefaultProxyModeShortcutMigrationV1"
-    private static let actionShortcutNames: [KeyboardShortcuts.Name] = [
+    static let actionShortcutNames: [KeyboardShortcuts.Name] = [
         .toggleSystemProxyMode,
         .copyShellCommand,
         .copyExternalShellCommand,
@@ -54,6 +54,7 @@ enum KeyboardShortCutManager {
         .benchmark,
         .nativeDashboard
     ]
+    static let allShortcutNames: [KeyboardShortcuts.Name] = actionShortcutNames + [.openMenu]
     private static var didSetup = false
     private static var didInstallActionHandlers = false
     private static var isStatusMenuTracking = false
@@ -254,6 +255,124 @@ enum KeyboardShortCutManager {
     }
 }
 
+private final class ClashFXShortcutRecorder: NSButton {
+    typealias ProposalHandler = (
+        KeyboardShortcuts.Name,
+        KeyboardShortcuts.Shortcut?,
+        NSEvent?
+    ) -> Bool
+
+    private let shortcutName: KeyboardShortcuts.Name
+    private let proposalHandler: ProposalHandler
+    private var eventMonitor: Any?
+    private var windowObserver: NSObjectProtocol?
+
+    init(
+        name: KeyboardShortcuts.Name,
+        proposalHandler: @escaping ProposalHandler
+    ) {
+        shortcutName = name
+        self.proposalHandler = proposalHandler
+        super.init(frame: .zero)
+        bezelStyle = .rounded
+        target = self
+        action = #selector(beginRecording)
+        setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        widthAnchor.constraint(greaterThanOrEqualToConstant: 130).isActive = true
+        updateTitle()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        stopRecording()
+    }
+
+    @objc private func beginRecording() {
+        stopRecording()
+        title = NSLocalizedString("Press shortcut", comment: "")
+        state = .on
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            self?.handle(event) ?? event
+        }
+        if let window = window {
+            windowObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                self?.stopRecording()
+            }
+        }
+    }
+
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        if event.keyCode == 53 {
+            stopRecording()
+            return nil
+        }
+        if event.keyCode == 51 || event.keyCode == 117 {
+            commit(nil, event: nil)
+            return nil
+        }
+
+        let modifiers = event.modifierFlags.intersection([
+            .command, .control, .option, .shift
+        ])
+        guard !modifiers.isEmpty,
+              let shortcut = KeyboardShortcuts.Shortcut(event: event) else {
+            NSSound.beep()
+            return nil
+        }
+        commit(shortcut, event: event)
+        return nil
+    }
+
+    private func commit(
+        _ shortcut: KeyboardShortcuts.Shortcut?,
+        event: NSEvent?
+    ) {
+        stopRecording()
+        guard proposalHandler(shortcutName, shortcut, event) else {
+            updateTitle()
+            return
+        }
+        let previous = KeyboardShortcuts.getShortcut(for: shortcutName)
+        KeyboardShortcuts.setShortcut(shortcut, for: shortcutName)
+        guard KeyboardShortcuts.getShortcut(for: shortcutName) == shortcut else {
+            KeyboardShortcuts.setShortcut(previous, for: shortcutName)
+            NSAlert.alert(with: NSLocalizedString("Shortcut registration failed", comment: ""))
+            updateTitle()
+            return
+        }
+        KeyboardShortCutManager.shortcutDidChange(shortcutName)
+        updateTitle()
+    }
+
+    private func stopRecording() {
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
+            self.eventMonitor = nil
+        }
+        if let windowObserver {
+            NotificationCenter.default.removeObserver(windowObserver)
+            self.windowObserver = nil
+        }
+        state = .off
+        updateTitle()
+    }
+
+    private func updateTitle() {
+        title = KeyboardShortcuts.getShortcut(for: shortcutName)
+            .map { "\($0)" }
+            ?? NSLocalizedString("Record Shortcut", comment: "")
+    }
+}
+
 class GlobalShortCutViewController: NSViewController {
     @IBOutlet var proxyBox: NSBox!
     @IBOutlet var modeBoxView: NSView!
@@ -295,12 +414,134 @@ class GlobalShortCutViewController: NSViewController {
         )
     }
 
-    private func getRecoder(for name: KeyboardShortcuts.Name) -> KeyboardShortcuts.RecorderCocoa {
-        let view = KeyboardShortcuts.RecorderCocoa(for: name) { _ in
-            KeyboardShortCutManager.shortcutDidChange(name)
-        }
+    private func getRecoder(for name: KeyboardShortcuts.Name) -> NSView {
+        let view = ClashFXShortcutRecorder(
+            name: name,
+            proposalHandler: { [weak self] name, shortcut, event in
+                self?.acceptShortcutProposal(
+                    name: name,
+                    shortcut: shortcut,
+                    event: event
+                ) ?? false
+            }
+        )
         view.setContentCompressionResistancePriority(.required, for: .vertical)
         return view
+    }
+
+    private func acceptShortcutProposal(
+        name: KeyboardShortcuts.Name,
+        shortcut: KeyboardShortcuts.Shortcut?,
+        event: NSEvent?
+    ) -> Bool {
+        let assignments = Dictionary(uniqueKeysWithValues:
+            KeyboardShortCutManager.allShortcutNames.compactMap { candidate in
+                KeyboardShortcuts.getShortcut(for: candidate).map {
+                    (candidate.rawValue, signature(for: $0))
+                }
+            })
+        if let duplicate = ShortcutRegistrationPolicy.duplicateOwner(
+            command: name.rawValue,
+            proposedSignature: shortcut.map { signature(for: $0) },
+            assignments: assignments
+        ) {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = NSLocalizedString("Shortcut already used", comment: "")
+            alert.informativeText = String(
+                format: NSLocalizedString("This shortcut is already assigned to %@.", comment: ""),
+                duplicate
+            )
+            alert.addButton(withTitle: NSLocalizedString("OK", comment: ""))
+            alert.runModal()
+            return false
+        }
+
+        guard let shortcut else { return true }
+        let menuItem = event.flatMap(matchingMainMenuItem(for:))
+        let systemReserved = isKnownSystemShortcut(shortcut)
+        guard ShortcutRegistrationPolicy.shouldWarnBeforeOverride(
+            matchesMainMenu: menuItem != nil,
+            isKnownSystemShortcut: systemReserved
+        ) else {
+            return true
+        }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = NSLocalizedString("Shortcut conflicts with macOS", comment: "")
+        if let menuItem = menuItem {
+            alert.informativeText = String(
+                format: NSLocalizedString("This shortcut is used by the “%@” menu command. Use it anyway?", comment: ""),
+                menuItem.title
+            )
+        } else {
+            alert.informativeText = NSLocalizedString(
+                "This shortcut is commonly reserved by macOS. Use it anyway?",
+                comment: ""
+            )
+        }
+        alert.addButton(withTitle: NSLocalizedString("Use Anyway", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func signature(for shortcut: KeyboardShortcuts.Shortcut) -> String {
+        "\(shortcut.carbonKeyCode):\(shortcut.carbonModifiers)"
+    }
+
+    private func matchingMainMenuItem(for event: NSEvent) -> NSMenuItem? {
+        guard let menu = NSApp.mainMenu,
+              let character = event.charactersIgnoringModifiers?.lowercased() else {
+            return nil
+        }
+        let modifiers = event.modifierFlags.intersection([
+            .command, .control, .option, .shift
+        ])
+        return matchingMenuItem(
+            in: menu,
+            keyEquivalent: character,
+            modifiers: modifiers
+        )
+    }
+
+    private func matchingMenuItem(
+        in menu: NSMenu,
+        keyEquivalent: String,
+        modifiers: NSEvent.ModifierFlags
+    ) -> NSMenuItem? {
+        for item in menu.items {
+            let itemModifiers = item.keyEquivalentModifierMask.intersection([
+                .command, .control, .option, .shift
+            ])
+            if item.keyEquivalent.lowercased() == keyEquivalent,
+               itemModifiers == modifiers {
+                return item
+            }
+            if let submenu = item.submenu,
+               let match = matchingMenuItem(
+                   in: submenu,
+                   keyEquivalent: keyEquivalent,
+                   modifiers: modifiers
+               ) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func isKnownSystemShortcut(
+        _ shortcut: KeyboardShortcuts.Shortcut
+    ) -> Bool {
+        let modifiers = shortcut.modifiers.intersection([
+            .command, .control, .option, .shift
+        ])
+        guard let key = shortcut.key else { return false }
+        if key == .space, modifiers == .command { return true }
+        if key == .tab, modifiers == .command { return true }
+        if [.leftArrow, .rightArrow, .upArrow, .downArrow].contains(key),
+           modifiers == .control { return true }
+        return false
     }
 
     private func makeGlobalShortcutsCheckbox() -> NSButton {

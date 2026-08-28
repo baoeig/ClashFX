@@ -609,3 +609,14 @@
 "TUN Route Exclude contains invalid entries:\n%@\n\nSeparate entries with commas or new lines, or reset the list." = "TUN Route Exclude contains invalid entries:\n%@\n\nSeparate entries with commas or new lines, or reset the list.";
 "Open Settings" = "Open Settings";
 "Core temporarily unavailable; showing the last valid rules snapshot" = "Core temporarily unavailable; showing the last valid rules snapshot";
+"Auto (runtime: %@)" = "Auto (runtime: %@)";
+"Restarting…" = "Restarting…";
+"Press shortcut" = "Press shortcut";
+"Record Shortcut" = "Record Shortcut";
+"Shortcut registration failed" = "Shortcut registration failed";
+"Shortcut already used" = "Shortcut already used";
+"This shortcut is already assigned to %@." = "This shortcut is already assigned to %@.";
+"Shortcut conflicts with macOS" = "Shortcut conflicts with macOS";
+"This shortcut is used by the “%@” menu command. Use it anyway?" = "This shortcut is used by the “%@” menu command. Use it anyway?";
+"This shortcut is commonly reserved by macOS. Use it anyway?" = "This shortcut is commonly reserved by macOS. Use it anyway?";
+"Use Anyway" = "Use Anyway";

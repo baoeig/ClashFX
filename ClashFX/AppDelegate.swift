@@ -259,6 +259,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ProcessInfo.processInfo.disableSuddenTermination()
         // setup menu item first
         statusItem = NSStatusBar.system.statusItem(withLength: statusItemLengthWithSpeed)
+        statusItem.autosaveName = "com.clashfx.app.statusItem"
         statusItemView = StatusItemView.create(statusItem: statusItem)
         statusItemView.updateSize(width: statusItemLengthWithSpeed)
         statusMenu.delegate = self
@@ -404,11 +405,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Fallback: TerminalCleanUpAction.run() already handles Enhanced Mode cleanup
         // in the normal quit path. This guard only fires if applicationWillTerminate
         // is reached without going through TerminalCleanUpAction (e.g. forced termination).
-        if ConfigManager.shared.isEnhancedModeActive {
+        if ConfigManager.shared.isEnhancedModeActive, !isRestarting {
             cleanupEnhancedModeForTermination {}
         }
-        if NetworkChangeNotifier.isCurrentSystemSetToClash(looser: true) ||
-            NetworkChangeNotifier.hasInterfaceProxySetToClash() {
+        if !isRestarting,
+           NetworkChangeNotifier.isCurrentSystemSetToClash(looser: true) ||
+           NetworkChangeNotifier.hasInterfaceProxySetToClash() {
             Logger.log("Need Reset Proxy Setting again", level: .error)
             SystemProxyManager.shared.disableProxy()
         }
@@ -4052,43 +4054,59 @@ extension AppDelegate {
         guard !isRestarting else { return }
         isRestarting = true
         let path = Bundle.main.bundlePath
+        let processIdentifier = ProcessInfo.processInfo.processIdentifier
 
-        if let item = statusItem {
-            NSStatusBar.system.removeStatusItem(item)
+        if let item = statusItem, item.menu != nil {
+            let restartingMenu = NSMenu()
+            let restartingItem = NSMenuItem(
+                title: NSLocalizedString("Restarting…", comment: ""),
+                action: nil,
+                keyEquivalent: ""
+            )
+            restartingItem.isEnabled = false
+            restartingMenu.addItem(restartingItem)
+            item.menu = restartingMenu
         }
 
-        let launchAndExit: () -> Void = {
-            let terminate = {
-                DispatchQueue.main.async {
-                    NSApp.terminate(nil)
-                }
-            }
-            if #available(macOS 10.15, *) {
-                let url = URL(fileURLWithPath: path)
-                let config = NSWorkspace.OpenConfiguration()
-                config.createsNewApplicationInstance = true
-                NSWorkspace.shared.openApplication(at: url, configuration: config) { _, error in
-                    if let error = error {
-                        Logger.log("ClashFX restart: openApplication failed: \(error.localizedDescription)", level: .error)
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: terminate)
-                }
-            } else {
-                let task = Process()
-                task.launchPath = "/bin/sh"
-                task.arguments = ["-c", "sleep 0.5 && open \"\(path)\""]
-                task.launch()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: terminate)
+        let launchAfterOldProcessExits: () -> Void = {
+            clashPauseCallbacks()
+            clashSuspendCore()
+
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/bin/sh")
+            task.arguments = [
+                "-c",
+                "while kill -0 \"$1\" 2>/dev/null; do sleep 0.1; done; exec /usr/bin/open \"$2\"",
+                "clashfx-relaunch",
+                String(processIdentifier),
+                path
+            ]
+            do {
+                try task.run()
+                Logger.log(
+                    "ClashFX restart: listeners released; replacement waits for PID \(processIdentifier) to exit"
+                )
+                NSApp.terminate(nil)
+            } catch {
+                Logger.log(
+                    "ClashFX restart: failed to start relaunch helper: \(error.localizedDescription)",
+                    level: .error
+                )
+                self.isRestarting = false
+                clashResumeCallbacks()
+                _ = clashResumeCore()
+                self.statusItem.menu = self.statusMenu
+                NSAlert.alert(with: error.localizedDescription)
             }
         }
 
         if ConfigManager.shared.isEnhancedModeActive {
             Logger.log("ClashFX restart: cleaning Enhanced Mode before relaunch")
             cleanupEnhancedModeForTermination {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: launchAndExit)
+                launchAfterOldProcessExits()
             }
         } else {
-            launchAndExit()
+            launchAfterOldProcessExits()
         }
     }
 }

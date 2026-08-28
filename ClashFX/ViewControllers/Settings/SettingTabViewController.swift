@@ -20,16 +20,6 @@ final class SettingsGroupBox: NSBox {
         configureTitleLayout()
     }
 
-    override var titleRect: NSRect {
-        var rect = super.titleRect
-        guard titlePosition != .noTitle else { return rect }
-
-        // Keep section headers distinct from and clear of their cards.
-        rect.origin.y += 6
-        rect.size.height += 4
-        return rect
-    }
-
     override func awakeFromNib() {
         super.awakeFromNib()
         if !title.isEmpty {
@@ -39,7 +29,10 @@ final class SettingsGroupBox: NSBox {
     }
 
     private func configureTitleLayout() {
-        titlePosition = .aboveTop
+        // Keep the title inside the box's drawing bounds. Moving an above-top
+        // title rectangle outside those bounds is clipped by several AppKit
+        // versions and by layer-backed settings containers.
+        titlePosition = .atTop
         titleFont = .systemFont(ofSize: 12, weight: .semibold)
         (titleCell as? NSTextFieldCell)?.textColor = .secondaryLabelColor
     }

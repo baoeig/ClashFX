@@ -602,3 +602,14 @@
 "TUN Route Exclude contains invalid entries:\n%@\n\nSeparate entries with commas or new lines, or reset the list." = "TUN 路由排除中包含無效項目：\n%@\n\n請使用逗號或換行分隔項目，或者重設此列表。";
 "Open Settings" = "開啟設定";
 "Core temporarily unavailable; showing the last valid rules snapshot" = "核心暫時無法使用，正在顯示上次有效的規則快照";
+"Auto (runtime: %@)" = "自動（目前執行：%@）";
+"Restarting…" = "正在重新啟動…";
+"Press shortcut" = "請按下快速鍵";
+"Record Shortcut" = "錄製快速鍵";
+"Shortcut registration failed" = "快速鍵註冊失敗";
+"Shortcut already used" = "快速鍵已被使用";
+"This shortcut is already assigned to %@." = "此快速鍵已指派給 %@。";
+"Shortcut conflicts with macOS" = "快速鍵與 macOS 衝突";
+"This shortcut is used by the “%@” menu command. Use it anyway?" = "此快速鍵已用於「%@」選單指令。仍要使用嗎？";
+"This shortcut is commonly reserved by macOS. Use it anyway?" = "此快速鍵通常由 macOS 保留。仍要使用嗎？";
+"Use Anyway" = "仍要使用";

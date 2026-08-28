@@ -28,6 +28,36 @@ final class ShortcutScopePolicyTests: XCTestCase {
         XCTAssertEqual(ShortcutRegistrationPolicy.actionScope(from: ShortcutScope.global.rawValue), .global)
         XCTAssertEqual(ShortcutRegistrationPolicy.actionScope(from: -1), .menuOnly)
     }
+
+    func testDuplicateShortcutIsHardBlockedButExternalConflictCanWarn() {
+        XCTAssertEqual(
+            ShortcutRegistrationPolicy.duplicateOwner(
+                command: "benchmark",
+                proposedSignature: "14:256",
+                assignments: ["enhanced": "14:256", "menu": "46:256"]
+            ),
+            "enhanced"
+        )
+        XCTAssertNil(
+            ShortcutRegistrationPolicy.duplicateOwner(
+                command: "enhanced",
+                proposedSignature: "14:256",
+                assignments: ["enhanced": "14:256"]
+            )
+        )
+        XCTAssertTrue(
+            ShortcutRegistrationPolicy.shouldWarnBeforeOverride(
+                matchesMainMenu: true,
+                isKnownSystemShortcut: false
+            )
+        )
+        XCTAssertFalse(
+            ShortcutRegistrationPolicy.shouldWarnBeforeOverride(
+                matchesMainMenu: false,
+                isKnownSystemShortcut: false
+            )
+        )
+    }
 }
 
 final class DiagnosticFormattingTests: XCTestCase {
@@ -1258,5 +1288,14 @@ final class StartupProxyRecoveryPolicyTests: XCTestCase {
             ),
             8
         )
+    }
+
+    func testAutomaticPortDisplaysRuntimeOnlyAsPlaceholder() {
+        XCTAssertEqual(PortPreferencePolicy.editableText(configuredPort: 0), "")
+        XCTAssertEqual(PortPreferencePolicy.editableText(configuredPort: 7890), "7890")
+        XCTAssertEqual(PortPreferencePolicy.configuredPort(from: ""), 0)
+        XCTAssertEqual(PortPreferencePolicy.configuredPort(from: " 9090 "), 9090)
+        XCTAssertNil(PortPreferencePolicy.configuredPort(from: "70000"))
+        XCTAssertNil(PortPreferencePolicy.configuredPort(from: "not-a-port"))
     }
 }

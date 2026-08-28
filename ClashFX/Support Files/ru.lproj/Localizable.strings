@@ -602,3 +602,14 @@
 "TUN Route Exclude contains invalid entries:\n%@\n\nSeparate entries with commas or new lines, or reset the list." = "Список исключений маршрутов TUN содержит недопустимые элементы:\n%@\n\nРазделите элементы запятыми или переносами строк либо сбросьте список.";
 "Open Settings" = "Открыть настройки";
 "Core temporarily unavailable; showing the last valid rules snapshot" = "Ядро временно недоступно; показан последний действительный снимок правил";
+"Auto (runtime: %@)" = "Авто (сейчас: %@)";
+"Restarting…" = "Перезапуск…";
+"Press shortcut" = "Нажмите сочетание клавиш";
+"Record Shortcut" = "Записать сочетание";
+"Shortcut registration failed" = "Не удалось зарегистрировать сочетание";
+"Shortcut already used" = "Сочетание уже используется";
+"This shortcut is already assigned to %@." = "Это сочетание уже назначено для %@.";
+"Shortcut conflicts with macOS" = "Сочетание конфликтует с macOS";
+"This shortcut is used by the “%@” menu command. Use it anyway?" = "Это сочетание используется командой меню «%@». Всё равно использовать?";
+"This shortcut is commonly reserved by macOS. Use it anyway?" = "Это сочетание обычно зарезервировано macOS. Всё равно использовать?";
+"Use Anyway" = "Всё равно использовать";

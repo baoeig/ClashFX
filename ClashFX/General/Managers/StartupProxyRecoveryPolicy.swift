@@ -79,3 +79,18 @@ enum WakeRecoveryRetryPolicy {
         return min(baseDelay * pow(2, Double(completedAttempts)), 8)
     }
 }
+
+enum PortPreferencePolicy {
+    static func editableText(configuredPort: Int) -> String {
+        configuredPort > 0 ? String(configuredPort) : ""
+    }
+
+    static func configuredPort(from input: String) -> Int? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+        guard let port = Int(trimmed), (1 ... 65_535).contains(port) else {
+            return nil
+        }
+        return port
+    }
+}

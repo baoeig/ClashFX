@@ -119,14 +119,26 @@ class GeneralSettingViewController: NSViewController {
         }.disposed(by: disposeBag)
 
         if Settings.proxyPort > 0 {
-            proxyPortTextField.stringValue = "\(Settings.proxyPort)"
+            proxyPortTextField.stringValue = PortPreferencePolicy.editableText(
+                configuredPort: Settings.proxyPort
+            )
         } else {
-            proxyPortTextField.stringValue = "\(ConfigManager.shared.currentConfig?.mixedPort ?? 0)"
+            proxyPortTextField.stringValue = ""
+            proxyPortTextField.placeholderString = String(
+                format: NSLocalizedString("Auto (runtime: %@)", comment: ""),
+                "\(ConfigManager.shared.currentConfig?.mixedPort ?? 0)"
+            )
         }
         if Settings.apiPort > 0 {
-            apiPortTextField.stringValue = "\(Settings.apiPort)"
+            apiPortTextField.stringValue = PortPreferencePolicy.editableText(
+                configuredPort: Settings.apiPort
+            )
         } else {
-            apiPortTextField.stringValue = ConfigManager.shared.apiPort
+            apiPortTextField.stringValue = ""
+            apiPortTextField.placeholderString = String(
+                format: NSLocalizedString("Auto (runtime: %@)", comment: ""),
+                ConfigManager.shared.apiPort
+            )
         }
 
         apiSecretTextField.stringValue = Settings.apiSecret
@@ -141,14 +153,16 @@ class GeneralSettingViewController: NSViewController {
 
         proxyPortTextField.rx.text
             .compactMap { $0 }
-            .compactMap { Int($0) }
+            .compactMap(PortPreferencePolicy.configuredPort(from:))
+            .distinctUntilChanged()
             .bind {
                 Settings.proxyPort = $0
             }.disposed(by: disposeBag)
 
         apiPortTextField.rx.text
             .compactMap { $0 }
-            .compactMap { Int($0) }
+            .compactMap(PortPreferencePolicy.configuredPort(from:))
+            .distinctUntilChanged()
             .bind {
                 Settings.apiPort = $0
             }.disposed(by: disposeBag)
