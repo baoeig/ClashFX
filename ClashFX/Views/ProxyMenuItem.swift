@@ -209,6 +209,7 @@ class ProxyMenuItem: NSMenuItem {
             delay: presentation.rowState.delayDisplay,
             rawValue: presentation.rowState.rawDelay
         )
+        applyStaleAppearance(presentation.isStale)
     }
 
     private func updateSelectorBenchmarkPresentation(from info: ClashProxy) {
@@ -276,12 +277,29 @@ class ProxyMenuItem: NSMenuItem {
     }
 
     private func updatePresentation(name: String, delay: String?, rawValue: Int?) {
+        view?.alphaValue = 1
         if enableShowUsingView {
             (view as? ProxyItemView)?.update(name: name)
             (view as? ProxyItemView)?.update(str: delay, value: rawValue)
         } else {
             attributedTitle = getAttributedTitle(name: name, delay: delay)
         }
+    }
+
+    private func applyStaleAppearance(_ stale: Bool) {
+        guard stale else { return }
+        if enableShowUsingView {
+            view?.alphaValue = 0.65
+            return
+        }
+        guard let attributedTitle else { return }
+        let muted = NSMutableAttributedString(attributedString: attributedTitle)
+        muted.addAttribute(
+            .foregroundColor,
+            value: NSColor.secondaryLabelColor,
+            range: NSRange(location: 0, length: muted.length)
+        )
+        self.attributedTitle = muted
     }
 }
 

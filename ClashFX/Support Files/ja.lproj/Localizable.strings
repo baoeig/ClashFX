@@ -613,3 +613,4 @@
 "This shortcut is used by the “%@” menu command. Use it anyway?" = "このショートカットはメニューコマンド「%@」で使用されています。それでも使用しますか？";
 "This shortcut is commonly reserved by macOS. Use it anyway?" = "このショートカットは通常 macOS で予約されています。それでも使用しますか？";
 "Use Anyway" = "このまま使用";
+"Configured port: %d; temporary runtime fallback: %d" = "設定ポート：%d、一時実行ポート：%d";

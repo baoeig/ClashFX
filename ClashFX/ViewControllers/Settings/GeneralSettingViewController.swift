@@ -122,6 +122,20 @@ class GeneralSettingViewController: NSViewController {
             proxyPortTextField.stringValue = PortPreferencePolicy.editableText(
                 configuredPort: Settings.proxyPort
             )
+            let runtimePort = ConfigManager.shared.currentConfig?.mixedPort ?? 0
+            proxyPortTextField.toolTip = PortPreferencePolicy.runtimeFallback(
+                configuredPort: Settings.proxyPort,
+                runtimePort: runtimePort
+            ).map {
+                String(
+                    format: NSLocalizedString(
+                        "Configured port: %d; temporary runtime fallback: %d",
+                        comment: ""
+                    ),
+                    $0.configured,
+                    $0.runtime
+                )
+            }
         } else {
             proxyPortTextField.stringValue = ""
             proxyPortTextField.placeholderString = String(
@@ -133,6 +147,20 @@ class GeneralSettingViewController: NSViewController {
             apiPortTextField.stringValue = PortPreferencePolicy.editableText(
                 configuredPort: Settings.apiPort
             )
+            let runtimePort = Int(ConfigManager.shared.apiPort) ?? 0
+            apiPortTextField.toolTip = PortPreferencePolicy.runtimeFallback(
+                configuredPort: Settings.apiPort,
+                runtimePort: runtimePort
+            ).map {
+                String(
+                    format: NSLocalizedString(
+                        "Configured port: %d; temporary runtime fallback: %d",
+                        comment: ""
+                    ),
+                    $0.configured,
+                    $0.runtime
+                )
+            }
         } else {
             apiPortTextField.stringValue = ""
             apiPortTextField.placeholderString = String(

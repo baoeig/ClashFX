@@ -93,4 +93,14 @@ enum PortPreferencePolicy {
         }
         return port
     }
+
+    static func runtimeFallback(
+        configuredPort: Int,
+        runtimePort: Int
+    ) -> (configured: Int, runtime: Int)? {
+        guard configuredPort > 0,
+              runtimePort > 0,
+              configuredPort != runtimePort else { return nil }
+        return (configuredPort, runtimePort)
+    }
 }

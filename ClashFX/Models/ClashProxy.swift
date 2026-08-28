@@ -286,6 +286,8 @@ enum ProxyBenchmarkRowState {
 }
 
 struct SelectorBenchmarkPresentation {
+    private static let freshCacheAge: TimeInterval = 30 * 60
+    private static let maximumCacheAge: TimeInterval = 24 * 60 * 60
     let selectorName: ClashProxyName
     let rowName: ClashProxyName
     let resolvedLeafName: ClashProxyName?
@@ -293,6 +295,10 @@ struct SelectorBenchmarkPresentation {
     let sessionIdentifier: UUID
     let rowState: ProxyBenchmarkRowState
     let publishedAt: Date
+
+    var isStale: Bool {
+        Date().timeIntervalSince(publishedAt) > Self.freshCacheAge
+    }
 
     init(
         selectorName: ClashProxyName,
@@ -316,8 +322,7 @@ struct SelectorBenchmarkPresentation {
         with snapshot: ClashProxyResp,
         currentBenchmarkURL: String
     ) -> SelectorBenchmarkPresentation {
-        let maximumCacheAge: TimeInterval = 24 * 60 * 60
-        guard Date().timeIntervalSince(publishedAt) <= maximumCacheAge else {
+        guard Date().timeIntervalSince(publishedAt) <= Self.maximumCacheAge else {
             return unavailable()
         }
         let currentAutomaticBenchmarkURL = snapshot.proxiesMap[rowName]

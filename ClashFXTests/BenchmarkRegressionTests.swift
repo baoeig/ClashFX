@@ -947,6 +947,46 @@ final class BenchmarkRegressionTests: XCTestCase {
         )
     }
 
+    func testSelectorPresentationMarksStaleEvidenceAndExpiresItAfterOneDay() {
+        let response = snapshot([
+            ["name": "Selector", "type": "Selector", "all": ["Leaf"], "now": "Leaf", "history": []],
+            ["name": "Leaf", "type": "Vless", "history": []]
+        ])
+        let stale = SelectorBenchmarkPresentation(
+            selectorName: "Selector",
+            rowName: "Leaf",
+            resolvedLeafName: "Leaf",
+            benchmarkURL: "https://benchmark.example.test",
+            sessionIdentifier: UUID(),
+            rowState: .measured(displayName: "Leaf", delay: 90),
+            publishedAt: Date(timeIntervalSinceNow: -(31 * 60))
+        )
+        XCTAssertTrue(stale.isStale)
+        XCTAssertEqual(
+            stale.reconciled(
+                with: response,
+                currentBenchmarkURL: "https://benchmark.example.test"
+            ).rowState.rawDelay,
+            90
+        )
+
+        let expired = SelectorBenchmarkPresentation(
+            selectorName: "Selector",
+            rowName: "Leaf",
+            resolvedLeafName: "Leaf",
+            benchmarkURL: "https://benchmark.example.test",
+            sessionIdentifier: UUID(),
+            rowState: .measured(displayName: "Leaf", delay: 90),
+            publishedAt: Date(timeIntervalSinceNow: -(25 * 60 * 60))
+        )
+        XCTAssertNil(
+            expired.reconciled(
+                with: response,
+                currentBenchmarkURL: "https://benchmark.example.test"
+            ).rowState.rawDelay
+        )
+    }
+
     func testAutomaticSnapshotsMapOnlyFreshPathEvidence() {
         let response = snapshot([
             ["name": "Automatic", "type": "URLTest", "all": ["Final", "LowerSibling"], "now": "Final", "history": []],
@@ -1297,5 +1337,17 @@ final class StartupProxyRecoveryPolicyTests: XCTestCase {
         XCTAssertEqual(PortPreferencePolicy.configuredPort(from: " 9090 "), 9090)
         XCTAssertNil(PortPreferencePolicy.configuredPort(from: "70000"))
         XCTAssertNil(PortPreferencePolicy.configuredPort(from: "not-a-port"))
+        XCTAssertNil(
+            PortPreferencePolicy.runtimeFallback(
+                configuredPort: 7890,
+                runtimePort: 7890
+            )
+        )
+        let fallback = PortPreferencePolicy.runtimeFallback(
+            configuredPort: 7890,
+            runtimePort: 23456
+        )
+        XCTAssertEqual(fallback?.configured, 7890)
+        XCTAssertEqual(fallback?.runtime, 23456)
     }
 }

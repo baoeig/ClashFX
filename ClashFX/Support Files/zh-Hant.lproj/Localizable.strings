@@ -613,3 +613,4 @@
 "This shortcut is used by the “%@” menu command. Use it anyway?" = "此快速鍵已用於「%@」選單指令。仍要使用嗎？";
 "This shortcut is commonly reserved by macOS. Use it anyway?" = "此快速鍵通常由 macOS 保留。仍要使用嗎？";
 "Use Anyway" = "仍要使用";
+"Configured port: %d; temporary runtime fallback: %d" = "設定連接埠：%d；暫時執行連接埠：%d";

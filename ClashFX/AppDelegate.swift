@@ -409,8 +409,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             cleanupEnhancedModeForTermination {}
         }
         if !isRestarting,
-           (NetworkChangeNotifier.isCurrentSystemSetToClash(looser: true) ||
-               NetworkChangeNotifier.hasInterfaceProxySetToClash()) {
+           NetworkChangeNotifier.isCurrentSystemSetToClash(looser: true) ||
+           NetworkChangeNotifier.hasInterfaceProxySetToClash() {
             Logger.log("Need Reset Proxy Setting again", level: .error)
             SystemProxyManager.shared.disableProxy()
         }

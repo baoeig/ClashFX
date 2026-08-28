@@ -620,3 +620,4 @@
 "This shortcut is used by the “%@” menu command. Use it anyway?" = "This shortcut is used by the “%@” menu command. Use it anyway?";
 "This shortcut is commonly reserved by macOS. Use it anyway?" = "This shortcut is commonly reserved by macOS. Use it anyway?";
 "Use Anyway" = "Use Anyway";
+"Configured port: %d; temporary runtime fallback: %d" = "Configured port: %d; temporary runtime fallback: %d";
