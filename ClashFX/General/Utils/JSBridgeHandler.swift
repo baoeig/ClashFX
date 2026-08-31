@@ -107,12 +107,10 @@ class JsBridgeUtil {
                     try fm.copyItem(at: bundleDashboard, to: clashHome)
                     setUIPath(clashHome.path.goStringBuffer())
                     DispatchQueue.main.async {
-                        WKWebsiteDataStore.default().removeData(
-                            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
-                            modifiedSince: Date(timeIntervalSince1970: 0)
-                        ) {}
-                        NotificationCenter.default.post(name: .reloadDashboard, object: nil)
-                        responseCallback(true)
+                        WebCacheCleaner.clean {
+                            NotificationCenter.default.post(name: .reloadDashboard, object: nil)
+                            responseCallback(true)
+                        }
                     }
                 } catch {
                     Logger.log("upgrade_ui failed: \(error)", level: .error)

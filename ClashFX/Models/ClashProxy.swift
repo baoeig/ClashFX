@@ -359,6 +359,62 @@ struct SelectorBenchmarkPresentation {
     }
 }
 
+struct AutomaticGroupBenchmarkIdentity: Equatable {
+    let groupName: ClashProxyName
+    let members: [ClashProxyName]
+    let benchmarkURL: String
+    let expectedStatus: String?
+
+    init(group: ClashProxy, fallbackBenchmarkURL: String) {
+        groupName = group.name
+        members = group.all ?? []
+        benchmarkURL = group.effectiveBenchmarkURL(fallback: fallbackBenchmarkURL)
+        expectedStatus = group.expectedStatus.flatMap {
+            let value = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        }
+    }
+}
+
+struct AutomaticGroupChildBenchmarkPresentation {
+    private static let freshCacheAge: TimeInterval = 30 * 60
+    private static let maximumCacheAge: TimeInterval = 24 * 60 * 60
+
+    let identity: AutomaticGroupBenchmarkIdentity
+    let rowName: ClashProxyName
+    let sessionIdentifier: UUID
+    let rowState: ProxyBenchmarkRowState
+    let publishedAt: Date
+
+    var isStale: Bool {
+        return Date().timeIntervalSince(publishedAt) > Self.freshCacheAge
+    }
+
+    init(identity: AutomaticGroupBenchmarkIdentity,
+         rowName: ClashProxyName,
+         sessionIdentifier: UUID,
+         rowState: ProxyBenchmarkRowState,
+         publishedAt: Date = .init()) {
+        self.identity = identity
+        self.rowName = rowName
+        self.sessionIdentifier = sessionIdentifier
+        self.rowState = rowState
+        self.publishedAt = publishedAt
+    }
+
+    func reconciled(group: ClashProxy,
+                    fallbackBenchmarkURL: String,
+                    now: Date = .init()) -> AutomaticGroupChildBenchmarkPresentation? {
+        guard now.timeIntervalSince(publishedAt) <= Self.maximumCacheAge,
+              identity == AutomaticGroupBenchmarkIdentity(
+                  group: group,
+                  fallbackBenchmarkURL: fallbackBenchmarkURL
+              ),
+              identity.members.contains(rowName) else { return nil }
+        return self
+    }
+}
+
 enum SelectorBenchmarkEndpoint: Hashable {
     case inline
     case provider
@@ -458,7 +514,7 @@ struct SelectorBenchmarkRow {
 struct SelectorBenchmarkConcurrencyPolicy {
     private static let minimumConcurrency = 4
     private static let initialConcurrency = 8
-    private static let maximumConcurrency = 16
+    private static let maximumConcurrency = 12
     private static let adjustmentStep = 4
 
     private let targetCount: Int
@@ -501,8 +557,16 @@ final class AdaptiveAsyncTaskRunner {
     private var policy: SelectorBenchmarkConcurrencyPolicy
     private var nextTaskIndex = 0
     private var activeTaskCount = 0
-    private var decisionOutcomes = [Bool]()
-    private var decisionWindowSize: Int
+    private struct LaunchCohort {
+        var expectedCount = 0
+        var outcomes = [Bool]()
+        var isClosed = false
+    }
+
+    private var cohorts = [Int: LaunchCohort]()
+    private var launchCohortIdentifier = 0
+    private var nextDecisionCohortIdentifier = 0
+    private var remainingLaunchesInCohort: Int
     private var completion: (() -> Void)?
 
     init(tasks: [Task],
@@ -511,7 +575,7 @@ final class AdaptiveAsyncTaskRunner {
         self.tasks = tasks
         self.policy = policy
         self.limitChanged = limitChanged
-        decisionWindowSize = policy.currentLimit
+        remainingLaunchesInCohort = policy.currentLimit
     }
 
     func start(completion: @escaping () -> Void) {
@@ -539,21 +603,46 @@ final class AdaptiveAsyncTaskRunner {
             nextTaskIndex += 1
             activeTaskCount += 1
 
+            let cohortIdentifier = launchCohortIdentifier
+            var cohort = cohorts[cohortIdentifier] ?? LaunchCohort()
+            cohort.expectedCount += 1
+            remainingLaunchesInCohort -= 1
+            if remainingLaunchesInCohort == 0 {
+                cohort.isClosed = true
+                launchCohortIdentifier += 1
+                remainingLaunchesInCohort = policy.currentLimit
+            }
+            cohorts[cohortIdentifier] = cohort
+
+            if nextTaskIndex == tasks.count,
+               remainingLaunchesInCohort != policy.currentLimit {
+                var finalCohort = cohorts[launchCohortIdentifier] ?? LaunchCohort()
+                finalCohort.isClosed = true
+                cohorts[launchCohortIdentifier] = finalCohort
+            }
+
             task { succeeded in
                 self.stateQueue.async {
                     self.activeTaskCount -= 1
-                    self.decisionOutcomes.append(succeeded)
-                    if self.decisionOutcomes.count >= self.decisionWindowSize {
-                        let previousLimit = self.policy.currentLimit
-                        self.policy.recordCohort(self.decisionOutcomes)
-                        self.decisionOutcomes.removeAll(keepingCapacity: true)
-                        self.decisionWindowSize = self.policy.currentLimit
-                        if self.policy.currentLimit != previousLimit {
-                            self.limitChanged?(previousLimit, self.policy.currentLimit)
-                        }
-                    }
+                    self.cohorts[cohortIdentifier]?.outcomes.append(succeeded)
+                    self.evaluateSettledLaunchCohorts()
                     self.scheduleAvailableTasks()
                 }
+            }
+        }
+    }
+
+    private func evaluateSettledLaunchCohorts() {
+        while let cohort = cohorts[nextDecisionCohortIdentifier],
+              cohort.isClosed,
+              cohort.outcomes.count == cohort.expectedCount,
+              cohort.expectedCount > 0 {
+            let previousLimit = policy.currentLimit
+            policy.recordCohort(cohort.outcomes)
+            cohorts[nextDecisionCohortIdentifier] = nil
+            nextDecisionCohortIdentifier += 1
+            if policy.currentLimit != previousLimit {
+                limitChanged?(previousLimit, policy.currentLimit)
             }
         }
     }
@@ -561,12 +650,15 @@ final class AdaptiveAsyncTaskRunner {
 
 struct SelectorBenchmarkRetryPolicy {
     let maxConcurrentRequests = 2
+    let maxRetryRequests = 4
 
     func retryTargets(
         from targets: [SelectorBenchmarkPlan.Target],
         firstPassDelays: [SelectorBenchmarkMeasurementKey: Int]
     ) -> [SelectorBenchmarkPlan.Target] {
-        return targets.filter { (firstPassDelays[$0.key] ?? 0) <= 0 }
+        return Array(targets
+            .filter { (firstPassDelays[$0.key] ?? 0) <= 0 }
+            .prefix(maxRetryRequests))
     }
 
     func finalDelay(

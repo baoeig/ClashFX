@@ -92,7 +92,15 @@ class ProxyGroupSpeedTestMenuItem: NSMenuItem {
         }
 
         beginBenchmarkAction(session: session)
-        AutomaticGroupBenchmarkPresentationStore.begin(group: proxyGroup)
+        let presentationSessionIdentifier = UUID()
+        AutomaticGroupBenchmarkPresentationStore.begin(
+            group: proxyGroup,
+            sessionIdentifier: presentationSessionIdentifier
+        )
+        AutomaticChildBenchmarkStore.begin(
+            group: proxyGroup,
+            sessionIdentifier: presentationSessionIdentifier
+        )
 
         var didFinish = false
         var bestKnownLeaf = proxyGroup.now
@@ -104,7 +112,12 @@ class ProxyGroupSpeedTestMenuItem: NSMenuItem {
                 if session.isCancelled {
                     AutomaticGroupBenchmarkPresentationStore.settleTestingAsUnavailable(
                         groupName: self.proxyGroup.name,
-                        finalLeaf: bestKnownLeaf
+                        finalLeaf: bestKnownLeaf,
+                        sessionIdentifier: presentationSessionIdentifier
+                    )
+                    AutomaticChildBenchmarkStore.settleTestingAsUnavailable(
+                        groupName: self.proxyGroup.name,
+                        sessionIdentifier: presentationSessionIdentifier
                     )
                 }
                 if AppDelegate.shared.isActiveBenchmarkSession(session) {
@@ -117,7 +130,12 @@ class ProxyGroupSpeedTestMenuItem: NSMenuItem {
             guard let self else { return }
             AutomaticGroupBenchmarkPresentationStore.settleTestingAsUnavailable(
                 groupName: self.proxyGroup.name,
-                finalLeaf: bestKnownLeaf
+                finalLeaf: bestKnownLeaf,
+                sessionIdentifier: presentationSessionIdentifier
+            )
+            AutomaticChildBenchmarkStore.settleTestingAsUnavailable(
+                groupName: self.proxyGroup.name,
+                sessionIdentifier: presentationSessionIdentifier
             )
         }
 
@@ -155,11 +173,37 @@ class ProxyGroupSpeedTestMenuItem: NSMenuItem {
                             )
                             AutomaticGroupBenchmarkPresentationStore.settleTestingAsUnavailable(
                                 groupName: self.proxyGroup.name,
-                                finalLeaf: bestKnownLeaf
+                                finalLeaf: bestKnownLeaf,
+                                sessionIdentifier: presentationSessionIdentifier
+                            )
+                            AutomaticChildBenchmarkStore.settleTestingAsUnavailable(
+                                groupName: self.proxyGroup.name,
+                                sessionIdentifier: presentationSessionIdentifier
                             )
                             didFinishAction()
                             return
                         }
+
+                        guard let freshGroup = snapshot.proxiesMap[self.proxyGroup.name],
+                              freshGroup.type.isAutoGroup else {
+                            AutomaticGroupBenchmarkPresentationStore.settleTestingAsUnavailable(
+                                groupName: self.proxyGroup.name,
+                                finalLeaf: bestKnownLeaf,
+                                sessionIdentifier: presentationSessionIdentifier
+                            )
+                            AutomaticChildBenchmarkStore.settleTestingAsUnavailable(
+                                groupName: self.proxyGroup.name,
+                                sessionIdentifier: presentationSessionIdentifier
+                            )
+                            didFinishAction()
+                            return
+                        }
+
+                        AutomaticChildBenchmarkStore.settle(
+                            group: freshGroup,
+                            candidateDelays: candidateDelays,
+                            sessionIdentifier: presentationSessionIdentifier
+                        )
 
                         let retestSnapshot = AutomaticGroupRetestSnapshot.make(
                             groupName: self.proxyGroup.name,
@@ -193,9 +237,13 @@ class ProxyGroupSpeedTestMenuItem: NSMenuItem {
                         }
                         AutomaticGroupBenchmarkPresentationStore.publish(
                             AutomaticGroupBenchmarkPresentation(
-                                groupName: self.proxyGroup.name,
+                                identity: AutomaticGroupBenchmarkIdentity(
+                                    group: freshGroup,
+                                    fallbackBenchmarkURL: Settings.benchMarkUrl
+                                ),
                                 selectedPath: retestSnapshot.selectedPath,
                                 finalLeaf: retestSnapshot.finalLeaf ?? bestKnownLeaf,
+                                sessionIdentifier: presentationSessionIdentifier,
                                 rowState: state
                             )
                         )
@@ -367,19 +415,24 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                 speedTestItem?.finishBenchmarkActionIfOwned(session: session)
             }
         }
-        let retestSelectedAutomaticGroup = {
+        let retestSelectedAutomaticGroup: (@escaping () -> Void) -> Void = { continuation in
             guard !session.isCancelled,
                   AppDelegate.shared.isActiveBenchmarkSession(session),
                   let plan,
                   let target = plan.selectedAutomaticRetest else {
-                finish()
+                continuation()
                 return
             }
             let deferredRows = plan.orderedRows.filter(\.isDeferredAutomaticRetest)
             guard !deferredRows.isEmpty else {
-                finish()
+                continuation()
                 return
             }
+
+            let automaticRetestStartedAt = Date()
+            Logger.log(
+                "[Proxy Delay] Prioritizing selected automatic group '\(target.groupName)' before Selector rows"
+            )
 
             ApiRequest.getProxyGroupDelay(
                 groupName: target.groupName,
@@ -415,9 +468,47 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                                         .unavailable(displayName: row.displayName)
                                     )
                                 }
-                                finish()
+                                AutomaticGroupBenchmarkPresentationStore.settleTestingAsUnavailable(
+                                    groupName: target.groupName,
+                                    finalLeaf: nil,
+                                    sessionIdentifier: sessionIdentifier
+                                )
+                                AutomaticChildBenchmarkStore.settleTestingAsUnavailable(
+                                    groupName: target.groupName,
+                                    sessionIdentifier: sessionIdentifier
+                                )
+                                continuation()
                                 return
                             }
+
+                            guard let freshGroup = snapshot.proxiesMap[target.groupName],
+                                  freshGroup.type.isAutoGroup else {
+                                for row in deferredRows where pendingRows.remove(row.rowName) != nil {
+                                    publishAutomaticState(
+                                        row,
+                                        target,
+                                        nil,
+                                        .unavailable(displayName: row.displayName)
+                                    )
+                                }
+                                AutomaticGroupBenchmarkPresentationStore.settleTestingAsUnavailable(
+                                    groupName: target.groupName,
+                                    finalLeaf: nil,
+                                    sessionIdentifier: sessionIdentifier
+                                )
+                                AutomaticChildBenchmarkStore.settleTestingAsUnavailable(
+                                    groupName: target.groupName,
+                                    sessionIdentifier: sessionIdentifier
+                                )
+                                continuation()
+                                return
+                            }
+
+                            AutomaticChildBenchmarkStore.settle(
+                                group: freshGroup,
+                                candidateDelays: result.candidateDelays,
+                                sessionIdentifier: sessionIdentifier
+                            )
 
                             let retestSnapshot = AutomaticGroupRetestSnapshot.make(
                                 groupName: target.groupName,
@@ -455,7 +546,24 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                                     state
                                 )
                             }
-                            finish()
+                            AutomaticGroupBenchmarkPresentationStore.publish(
+                                AutomaticGroupBenchmarkPresentation(
+                                    identity: AutomaticGroupBenchmarkIdentity(
+                                        group: freshGroup,
+                                        fallbackBenchmarkURL: Settings.benchMarkUrl
+                                    ),
+                                    selectedPath: retestSnapshot.selectedPath,
+                                    finalLeaf: retestSnapshot.finalLeaf,
+                                    sessionIdentifier: sessionIdentifier,
+                                    rowState: state
+                                )
+                            )
+                            Logger.log(
+                                "[Proxy Delay] Selected automatic group '\(target.groupName)' completed in "
+                                    + String(format: "%.2f", Date().timeIntervalSince(automaticRetestStartedAt))
+                                    + "s; starting Selector rows"
+                            )
+                            continuation()
                         }
                     }
                 }
@@ -501,6 +609,17 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                         for row in plan.orderedRows where pendingRows.remove(row.rowName) != nil {
                             publishState(row, .unavailable(displayName: row.displayName))
                         }
+                        if let target = plan.selectedAutomaticRetest {
+                            AutomaticGroupBenchmarkPresentationStore.settleTestingAsUnavailable(
+                                groupName: target.groupName,
+                                finalLeaf: nil,
+                                sessionIdentifier: sessionIdentifier
+                            )
+                            AutomaticChildBenchmarkStore.settleTestingAsUnavailable(
+                                groupName: target.groupName,
+                                sessionIdentifier: sessionIdentifier
+                            )
+                        }
                         presentationCoalescer.flush()
                     }
                 }
@@ -511,12 +630,25 @@ private class ProxyGroupSpeedTestMenuItemView: MenuItemBaseView {
                         publishState(row, .testing(displayName: row.displayName))
                     }
                 }
-                ApiRequest.benchmarkSelectorPlan(
-                    plan,
-                    session: session,
-                    result: publishResult,
-                    completion: retestSelectedAutomaticGroup
-                )
+                if let target = plan.selectedAutomaticRetest,
+                   let automaticGroup = response.proxiesMap[target.groupName] {
+                    AutomaticGroupBenchmarkPresentationStore.begin(
+                        group: automaticGroup,
+                        sessionIdentifier: sessionIdentifier
+                    )
+                    AutomaticChildBenchmarkStore.begin(
+                        group: automaticGroup,
+                        sessionIdentifier: sessionIdentifier
+                    )
+                }
+                retestSelectedAutomaticGroup {
+                    ApiRequest.benchmarkSelectorPlan(
+                        plan,
+                        session: session,
+                        result: publishResult,
+                        completion: finish
+                    )
+                }
             }
         }
     }

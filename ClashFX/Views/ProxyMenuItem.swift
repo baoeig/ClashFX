@@ -66,6 +66,126 @@ enum SelectorBenchmarkPresentationStore {
     }
 }
 
+enum AutomaticChildBenchmarkStore {
+    private struct Key: Hashable {
+        let groupName: ClashProxyName
+        let rowName: ClashProxyName
+    }
+
+    private static var presentations = [Key: AutomaticGroupChildBenchmarkPresentation]()
+
+    static func begin(group: ClashProxy, sessionIdentifier: UUID) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        let identity = AutomaticGroupBenchmarkIdentity(
+            group: group,
+            fallbackBenchmarkURL: Settings.benchMarkUrl
+        )
+        presentations = presentations.filter { $0.key.groupName != group.name }
+        for rowName in identity.members {
+            publish(AutomaticGroupChildBenchmarkPresentation(
+                identity: identity,
+                rowName: rowName,
+                sessionIdentifier: sessionIdentifier,
+                rowState: .testing(displayName: rowName)
+            ))
+        }
+    }
+
+    static func settle(group: ClashProxy,
+                       candidateDelays: [ClashProxyName: Int],
+                       sessionIdentifier: UUID) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        guard presentations.contains(where: {
+            $0.key.groupName == group.name
+                && $0.value.sessionIdentifier == sessionIdentifier
+        }) else { return }
+        let identity = AutomaticGroupBenchmarkIdentity(
+            group: group,
+            fallbackBenchmarkURL: Settings.benchMarkUrl
+        )
+        presentations = presentations.filter { key, presentation in
+            key.groupName != group.name
+                || (presentation.sessionIdentifier == sessionIdentifier
+                    && identity.members.contains(key.rowName))
+        }
+        for rowName in identity.members {
+            let state: ProxyBenchmarkRowState
+            if let delay = candidateDelays[rowName] {
+                state = delay > 0
+                    ? .measured(displayName: rowName, delay: delay)
+                    : .failed(displayName: rowName)
+            } else {
+                state = .unavailable(displayName: rowName)
+            }
+            publish(AutomaticGroupChildBenchmarkPresentation(
+                identity: identity,
+                rowName: rowName,
+                sessionIdentifier: sessionIdentifier,
+                rowState: state
+            ))
+        }
+    }
+
+    static func settleTestingAsUnavailable(groupName: ClashProxyName,
+                                           sessionIdentifier: UUID) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        let current = presentations.filter {
+            $0.key.groupName == groupName
+                && $0.value.sessionIdentifier == sessionIdentifier
+        }
+        for (_, presentation) in current {
+            guard case .testing = presentation.rowState else { continue }
+            publish(AutomaticGroupChildBenchmarkPresentation(
+                identity: presentation.identity,
+                rowName: presentation.rowName,
+                sessionIdentifier: presentation.sessionIdentifier,
+                rowState: .unavailable(displayName: presentation.rowName)
+            ))
+        }
+    }
+
+    static func presentation(group: ClashProxy,
+                             rowName: ClashProxyName) -> AutomaticGroupChildBenchmarkPresentation? {
+        dispatchPrecondition(condition: .onQueue(.main))
+        let key = Key(groupName: group.name, rowName: rowName)
+        guard let current = presentations[key] else { return nil }
+        guard let reconciled = current.reconciled(
+            group: group,
+            fallbackBenchmarkURL: Settings.benchMarkUrl
+        ) else {
+            presentations[key] = nil
+            return nil
+        }
+        return reconciled
+    }
+
+    static func prune(using snapshot: ClashProxyResp) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        presentations = presentations.filter { key, presentation in
+            guard let group = snapshot.proxiesMap[key.groupName],
+                  group.type.isAutoGroup else { return false }
+            return presentation.reconciled(
+                group: group,
+                fallbackBenchmarkURL: Settings.benchMarkUrl
+            ) != nil
+        }
+    }
+
+    static func clearAll() {
+        dispatchPrecondition(condition: .onQueue(.main))
+        presentations.removeAll()
+    }
+
+    private static func publish(_ presentation: AutomaticGroupChildBenchmarkPresentation) {
+        let key = Key(
+            groupName: presentation.identity.groupName,
+            rowName: presentation.rowName
+        )
+        presentations[key] = presentation
+        NotificationCenter.default.post(name: .speedTestFinishForProxy, object: presentation)
+    }
+}
+
 class ProxyMenuItem: NSMenuItem {
     let proxyName: String
     let maxProxyNameLength: CGFloat
@@ -114,6 +234,8 @@ class ProxyMenuItem: NSMenuItem {
 
         if !simpleItem, group.type == .select {
             updateSelectorBenchmarkPresentation(from: proxy)
+        } else if !simpleItem, group.type.isAutoGroup {
+            updateAutomaticChildBenchmarkPresentation(from: proxy)
         }
 
         NotificationCenter.default.addObserver(self, selector: #selector(proxyGroupInfoUpdate(note:)), name: .proxyUpdate(for: group.name), object: nil)
@@ -145,7 +267,13 @@ class ProxyMenuItem: NSMenuItem {
         }
         guard let presentation = note.object as? SelectorBenchmarkPresentation,
               presentation.selectorName == parentGroupName,
-              presentation.rowName == proxyName else { return }
+              presentation.rowName == proxyName else {
+            guard let presentation = note.object as? AutomaticGroupChildBenchmarkPresentation,
+                  presentation.identity.groupName == parentGroupName,
+                  presentation.rowName == proxyName else { return }
+            applyAutomaticChildBenchmarkPresentation(presentation)
+            return
+        }
         applySelectorBenchmarkPresentation(presentation)
     }
 
@@ -162,6 +290,10 @@ class ProxyMenuItem: NSMenuItem {
         }
         if parentGroupType == .select {
             updateSelectorBenchmarkPresentation(from: info)
+            return
+        }
+        if parentGroupType.isAutoGroup {
+            updateAutomaticChildBenchmarkPresentation(from: info)
             return
         }
         if info.alive == false {
@@ -210,6 +342,56 @@ class ProxyMenuItem: NSMenuItem {
             rawValue: presentation.rowState.rawDelay
         )
         applyStaleAppearance(presentation.isStale)
+    }
+
+    private func applyAutomaticChildBenchmarkPresentation(
+        _ presentation: AutomaticGroupChildBenchmarkPresentation
+    ) {
+        presentationName = presentation.rowName
+        updatePresentation(
+            name: presentation.rowName,
+            delay: presentation.rowState.delayDisplay,
+            rawValue: presentation.rowState.rawDelay
+        )
+        applyStaleAppearance(presentation.isStale)
+    }
+
+    private func updateAutomaticChildBenchmarkPresentation(from info: ClashProxy) {
+        guard let snapshot = info.enclosingResp,
+              let group = snapshot.proxiesMap[parentGroupName] else {
+            updatePresentation(name: proxyName, delay: nil, rawValue: nil)
+            return
+        }
+        if let presentation = AutomaticChildBenchmarkStore.presentation(
+            group: group,
+            rowName: proxyName
+        ) {
+            applyAutomaticChildBenchmarkPresentation(presentation)
+            return
+        }
+
+        presentationName = proxyName
+        let evidenceProxy = info.testState(for: parentBenchmarkURL) == nil
+            ? (finalLeaf(from: info) ?? info)
+            : info
+        guard let state = evidenceProxy.testState(for: parentBenchmarkURL),
+              let history = state.history.last else {
+            updatePresentation(name: proxyName, delay: nil, rawValue: nil)
+            return
+        }
+        if !state.alive || history.delay == 0 {
+            updatePresentation(
+                name: proxyName,
+                delay: NSLocalizedString("fail", comment: ""),
+                rawValue: 0
+            )
+        } else {
+            updatePresentation(
+                name: proxyName,
+                delay: history.delayDisplay,
+                rawValue: history.delay
+            )
+        }
     }
 
     private func updateSelectorBenchmarkPresentation(from info: ClashProxy) {

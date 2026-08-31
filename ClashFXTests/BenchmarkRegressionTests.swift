@@ -1,5 +1,31 @@
 import Cocoa
+import WebKit
 import XCTest
+
+final class DashboardWebsiteDataPolicyTests: XCTestCase {
+    func testCacheCleanupPreservesPersistentDashboardState() {
+        let availableTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+        let removableTypes = DashboardWebsiteDataPolicy.removableDataTypes(from: availableTypes)
+
+        XCTAssertFalse(removableTypes.contains(WKWebsiteDataTypeLocalStorage))
+        XCTAssertFalse(removableTypes.contains(WKWebsiteDataTypeCookies))
+        XCTAssertFalse(removableTypes.contains(WKWebsiteDataTypeIndexedDBDatabases))
+        XCTAssertTrue(removableTypes.isSubset(of: DashboardWebsiteDataPolicy.volatileDataTypes))
+    }
+
+    func testKnownVolatileCachesAreEligibleForCleanup() {
+        let availableTypes: Set<String> = [
+            WKWebsiteDataTypeMemoryCache,
+            WKWebsiteDataTypeDiskCache,
+            WKWebsiteDataTypeLocalStorage,
+        ]
+
+        XCTAssertEqual(
+            DashboardWebsiteDataPolicy.removableDataTypes(from: availableTypes),
+            [WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeDiskCache]
+        )
+    }
+}
 
 final class ShortcutScopePolicyTests: XCTestCase {
     func testActionShortcutsDefaultToMenuOnly() {
@@ -621,10 +647,10 @@ final class BenchmarkRegressionTests: XCTestCase {
         XCTAssertEqual(plan.targets.count, 25)
         XCTAssertEqual(plan.maxConcurrentRequests, 8)
         XCTAssertEqual(plan.concurrencyPolicy.minimumLimit, 4)
-        XCTAssertEqual(plan.concurrencyPolicy.maximumLimit, 16)
+        XCTAssertEqual(plan.concurrencyPolicy.maximumLimit, 12)
     }
 
-    func testSelectorConcurrencyRampsFromEightToSixteenAfterHealthyWindows() {
+    func testSelectorConcurrencyRampsFromEightToTwelveAndStops() {
         var policy = SelectorBenchmarkConcurrencyPolicy(targetCount: 49)
         XCTAssertEqual(policy.currentLimit, 8)
 
@@ -632,10 +658,10 @@ final class BenchmarkRegressionTests: XCTestCase {
         XCTAssertEqual(policy.currentLimit, 12)
 
         policy.recordCohort(Array(repeating: true, count: 10) + [false, false])
-        XCTAssertEqual(policy.currentLimit, 16)
+        XCTAssertEqual(policy.currentLimit, 12)
 
         policy.recordCohort(Array(repeating: true, count: 16))
-        XCTAssertEqual(policy.currentLimit, 16)
+        XCTAssertEqual(policy.currentLimit, 12)
     }
 
     func testSelectorConcurrencyHoldsForMixedWindowAndBacksOffOnClusteredFailures() {
@@ -808,8 +834,32 @@ final class BenchmarkRegressionTests: XCTestCase {
         }
         wait(for: [completion], timeout: 2)
 
-        XCTAssertEqual(limitChanges.map(\.0), [8, 12])
-        XCTAssertEqual(limitChanges.map(\.1), [12, 16])
+        XCTAssertEqual(limitChanges.map(\.0), [8])
+        XCTAssertEqual(limitChanges.map(\.1), [12])
+    }
+
+    func testSelectorRetryPolicyCapsTheFailureTail() throws {
+        let names = (1 ... 20).map { "Node \($0)" }
+        var proxies: [[String: Any]] = [
+            ["name": "Selector", "type": "Selector", "all": names, "now": names[0], "history": []]
+        ]
+        proxies.append(contentsOf: names.map {
+            ["name": $0, "type": "Vless", "history": []]
+        })
+        let response = snapshot(proxies)
+        let plan = try SelectorBenchmarkPlan.make(
+            selector: XCTUnwrap(response.proxiesMap["Selector"]),
+            snapshot: response,
+            benchmarkURL: "https://benchmark.example.test",
+            timeout: 5
+        )
+        let failures = Dictionary(uniqueKeysWithValues: plan.targets.map { ($0.key, 0) })
+        let policy = SelectorBenchmarkRetryPolicy()
+
+        XCTAssertEqual(policy.retryTargets(
+            from: plan.targets,
+            firstPassDelays: failures
+        ).count, 4)
     }
 
     func testProxyHistoryIsScopedToExactBenchmarkURL() throws {
@@ -1022,6 +1072,93 @@ final class BenchmarkRegressionTests: XCTestCase {
             return XCTFail("expected zeroDelay")
         }
         XCTAssertEqual(node, "Final")
+    }
+
+    func testAutomaticChildPresentationRejectsMembershipURLAndStatusChanges() throws {
+        let original = snapshot([
+            [
+                "name": "Automatic",
+                "type": "URLTest",
+                "all": ["Leaf A", "Leaf B"],
+                "now": "Leaf A",
+                "history": [],
+                "testUrl": "https://group.example.test",
+                "expectedStatus": "204",
+            ],
+            ["name": "Leaf A", "type": "Vless", "history": []],
+            ["name": "Leaf B", "type": "Vless", "history": []],
+        ])
+        let originalGroup = try XCTUnwrap(original.proxiesMap["Automatic"])
+        let presentation = AutomaticGroupChildBenchmarkPresentation(
+            identity: AutomaticGroupBenchmarkIdentity(
+                group: originalGroup,
+                fallbackBenchmarkURL: "https://fallback.example.test"
+            ),
+            rowName: "Leaf A",
+            sessionIdentifier: UUID(),
+            rowState: .measured(displayName: "Leaf A", delay: 87)
+        )
+        XCTAssertNotNil(presentation.reconciled(
+            group: originalGroup,
+            fallbackBenchmarkURL: "https://fallback.example.test"
+        ))
+
+        let membershipChanged = snapshot([
+            [
+                "name": "Automatic",
+                "type": "URLTest",
+                "all": ["Leaf B"],
+                "now": "Leaf B",
+                "history": [],
+                "testUrl": "https://group.example.test",
+                "expectedStatus": "204",
+            ],
+            ["name": "Leaf B", "type": "Vless", "history": []],
+        ])
+        XCTAssertNil(try presentation.reconciled(
+            group: XCTUnwrap(membershipChanged.proxiesMap["Automatic"]),
+            fallbackBenchmarkURL: "https://fallback.example.test"
+        ))
+
+        let benchmarkChanged = snapshot([
+            [
+                "name": "Automatic",
+                "type": "URLTest",
+                "all": ["Leaf A", "Leaf B"],
+                "now": "Leaf A",
+                "history": [],
+                "testUrl": "https://changed.example.test",
+                "expectedStatus": "200",
+            ],
+            ["name": "Leaf A", "type": "Vless", "history": []],
+            ["name": "Leaf B", "type": "Vless", "history": []],
+        ])
+        XCTAssertNil(try presentation.reconciled(
+            group: XCTUnwrap(benchmarkChanged.proxiesMap["Automatic"]),
+            fallbackBenchmarkURL: "https://fallback.example.test"
+        ))
+    }
+
+    func testAutomaticChildPresentationExpiresAfterOneDay() throws {
+        let response = snapshot([
+            ["name": "Automatic", "type": "Fallback", "all": ["Leaf"], "now": "Leaf", "history": []],
+            ["name": "Leaf", "type": "Vless", "history": []],
+        ])
+        let group = try XCTUnwrap(response.proxiesMap["Automatic"])
+        let presentation = AutomaticGroupChildBenchmarkPresentation(
+            identity: AutomaticGroupBenchmarkIdentity(
+                group: group,
+                fallbackBenchmarkURL: "https://fallback.example.test"
+            ),
+            rowName: "Leaf",
+            sessionIdentifier: UUID(),
+            rowState: .measured(displayName: "Leaf", delay: 120),
+            publishedAt: Date(timeIntervalSinceNow: -(25 * 60 * 60))
+        )
+        XCTAssertNil(presentation.reconciled(
+            group: group,
+            fallbackBenchmarkURL: "https://fallback.example.test"
+        ))
     }
 
     func testCancelTerminatesObserversOnceAndRejectsObsoleteGeneration() {

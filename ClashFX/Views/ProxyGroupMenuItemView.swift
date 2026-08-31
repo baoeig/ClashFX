@@ -6,10 +6,45 @@
 import Cocoa
 
 struct AutomaticGroupBenchmarkPresentation {
-    let groupName: ClashProxyName
+    private static let freshCacheAge: TimeInterval = 30 * 60
+    private static let maximumCacheAge: TimeInterval = 24 * 60 * 60
+
+    let identity: AutomaticGroupBenchmarkIdentity
     let selectedPath: [ClashProxyName]
     let finalLeaf: ClashProxyName?
+    let sessionIdentifier: UUID
     let rowState: ProxyBenchmarkRowState
+    let publishedAt: Date
+
+    var groupName: ClashProxyName {
+        return identity.groupName
+    }
+
+    var isStale: Bool {
+        return Date().timeIntervalSince(publishedAt) > Self.freshCacheAge
+    }
+
+    init(identity: AutomaticGroupBenchmarkIdentity,
+         selectedPath: [ClashProxyName],
+         finalLeaf: ClashProxyName?,
+         sessionIdentifier: UUID,
+         rowState: ProxyBenchmarkRowState,
+         publishedAt: Date = .init()) {
+        self.identity = identity
+        self.selectedPath = selectedPath
+        self.finalLeaf = finalLeaf
+        self.sessionIdentifier = sessionIdentifier
+        self.rowState = rowState
+        self.publishedAt = publishedAt
+    }
+
+    func isValid(for group: ClashProxy) -> Bool {
+        return Date().timeIntervalSince(publishedAt) <= Self.maximumCacheAge
+            && identity == AutomaticGroupBenchmarkIdentity(
+                group: group,
+                fallbackBenchmarkURL: Settings.benchMarkUrl
+            )
+    }
 }
 
 /// Retains a single automatic-group result across the terminal menu rebuild.
@@ -17,13 +52,17 @@ struct AutomaticGroupBenchmarkPresentation {
 enum AutomaticGroupBenchmarkPresentationStore {
     private static var presentations = [ClashProxyName: AutomaticGroupBenchmarkPresentation]()
 
-    static func begin(group: ClashProxy) {
+    static func begin(group: ClashProxy, sessionIdentifier: UUID) {
         dispatchPrecondition(condition: .onQueue(.main))
         let path = selectedPath(for: group)
         let presentation = AutomaticGroupBenchmarkPresentation(
-            groupName: group.name,
+            identity: AutomaticGroupBenchmarkIdentity(
+                group: group,
+                fallbackBenchmarkURL: Settings.benchMarkUrl
+            ),
             selectedPath: path,
             finalLeaf: path.last,
+            sessionIdentifier: sessionIdentifier,
             rowState: .testing(displayName: displayName(groupName: group.name, finalLeaf: path.last))
         )
         publish(presentation)
@@ -39,14 +78,17 @@ enum AutomaticGroupBenchmarkPresentationStore {
     }
 
     static func settleTestingAsUnavailable(groupName: ClashProxyName,
-                                           finalLeaf: ClashProxyName?) {
+                                           finalLeaf: ClashProxyName?,
+                                           sessionIdentifier: UUID) {
         dispatchPrecondition(condition: .onQueue(.main))
         guard let presentation = presentations[groupName] else { return }
+        guard presentation.sessionIdentifier == sessionIdentifier else { return }
         guard case .testing = presentation.rowState else { return }
         publish(AutomaticGroupBenchmarkPresentation(
-            groupName: groupName,
+            identity: presentation.identity,
             selectedPath: presentation.selectedPath,
             finalLeaf: finalLeaf ?? presentation.finalLeaf,
+            sessionIdentifier: presentation.sessionIdentifier,
             rowState: .unavailable(displayName: displayName(
                 groupName: groupName,
                 finalLeaf: finalLeaf ?? presentation.finalLeaf
@@ -57,6 +99,14 @@ enum AutomaticGroupBenchmarkPresentationStore {
     static func reconcile(group: ClashProxy) -> AutomaticGroupBenchmarkPresentation? {
         dispatchPrecondition(condition: .onQueue(.main))
         guard let current = presentations[group.name] else { return nil }
+        guard current.isValid(for: group) else {
+            presentations[group.name] = nil
+            Logger.log(
+                "[Proxy Delay] Automatic group '\(group.name)' discarded stale or mismatched benchmark evidence",
+                level: .warning
+            )
+            return nil
+        }
         let path = selectedPath(for: group)
         guard path == current.selectedPath else {
             let finalLeaf = path.last ?? current.finalLeaf
@@ -72,9 +122,10 @@ enum AutomaticGroupBenchmarkPresentationStore {
                 replacement = .unavailable(displayName: displayName(groupName: group.name, finalLeaf: finalLeaf))
             }
             let presentation = AutomaticGroupBenchmarkPresentation(
-                groupName: group.name,
+                identity: current.identity,
                 selectedPath: path,
                 finalLeaf: finalLeaf,
+                sessionIdentifier: current.sessionIdentifier,
                 rowState: replacement
             )
             presentations[group.name] = presentation
@@ -85,8 +136,10 @@ enum AutomaticGroupBenchmarkPresentationStore {
 
     static func prune(using snapshot: ClashProxyResp) {
         dispatchPrecondition(condition: .onQueue(.main))
-        presentations = presentations.filter { groupName, _ in
-            snapshot.proxiesMap[groupName]?.type.isAutoGroup == true
+        presentations = presentations.filter { groupName, presentation in
+            guard let group = snapshot.proxiesMap[groupName],
+                  group.type.isAutoGroup else { return false }
+            return presentation.isValid(for: group)
         }
     }
 
@@ -218,6 +271,7 @@ class ProxyGroupMenuItemView: MenuItemBaseView {
     }
 
     private func render(_ presentation: AutomaticGroupBenchmarkPresentation) {
+        effectView.alphaValue = presentation.isStale ? 0.65 : 1
         let leaf = presentation.finalLeaf ?? presentation.rowState.presentationName
         if let result = presentation.rowState.delayDisplay {
             selectProxyLabel.stringValue = "\(leaf) · \(result)"

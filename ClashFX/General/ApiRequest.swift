@@ -988,6 +988,8 @@ class ApiRequest {
 
         let resultQueue = DispatchQueue(label: "com.clashfx.selectorBenchmarkResults")
         var firstPassDelays = [SelectorBenchmarkMeasurementKey: Int]()
+        let benchmarkStartedAt = Date()
+        var didLogFirstResult = false
 
         let runTarget: (SelectorBenchmarkPlan.Target, @escaping (Int) -> Void) -> Void = { target, done in
             guard !session.isCancelled else {
@@ -1029,6 +1031,14 @@ class ApiRequest {
                 runTarget(target) { delay in
                     resultQueue.sync {
                         firstPassDelays[target.key] = delay
+                        if !didLogFirstResult {
+                            didLogFirstResult = true
+                            Logger.log(
+                                "[Proxy Delay] Selector first result after "
+                                    + String(format: "%.2f", Date().timeIntervalSince(benchmarkStartedAt))
+                                    + "s"
+                            )
+                        }
                     }
                     // Successful rows are final and can be shown immediately.
                     // Failures remain in the testing state until their one retry
@@ -1065,9 +1075,22 @@ class ApiRequest {
             }
 
             let retryPolicy = SelectorBenchmarkRetryPolicy()
-            let retryTargets = resultQueue.sync {
-                retryPolicy.retryTargets(from: plan.targets, firstPassDelays: firstPassDelays)
+            let failedTargets = resultQueue.sync {
+                plan.targets.filter { (firstPassDelays[$0.key] ?? 0) <= 0 }
             }
+            let retryTargets = retryPolicy.retryTargets(
+                from: plan.targets,
+                firstPassDelays: firstPassDelays
+            )
+            let retryKeys = Set(retryTargets.map(\.key))
+            for target in failedTargets where !retryKeys.contains(target.key) {
+                result(target, 0)
+            }
+            Logger.log(
+                "[Proxy Delay] Selector first pass completed in "
+                    + String(format: "%.2f", Date().timeIntervalSince(benchmarkStartedAt))
+                    + "s; \(failedTargets.count) failure(s), retrying \(retryTargets.count)"
+            )
             guard !retryTargets.isEmpty else {
                 completion()
                 return
@@ -1096,6 +1119,11 @@ class ApiRequest {
                     completion()
                     return
                 }
+                Logger.log(
+                    "[Proxy Delay] Selector retry tail completed after "
+                        + String(format: "%.2f", Date().timeIntervalSince(benchmarkStartedAt))
+                        + "s total"
+                )
                 completion()
             }
         }

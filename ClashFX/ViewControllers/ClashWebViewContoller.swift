@@ -12,19 +12,25 @@ import RxSwift
 import WebKit
 
 enum WebCacheCleaner {
-    static func clean() {
-        DispatchQueue.global(qos: .utility).async {
-            HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)
-            Logger.log("[WebCacheCleaner] All cookies deleted")
-        }
-        DispatchQueue.main.async {
+    static func clean(completionHandler: @escaping () -> Void = {}) {
+        let cleanup = {
             let store = WKWebsiteDataStore.default()
-            store.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
-                for record in records {
-                    store.removeData(ofTypes: record.dataTypes, for: [record], completionHandler: {})
-                    Logger.log("[WebCacheCleaner] Record \(record) deleted")
-                }
+            let dataTypes = DashboardWebsiteDataPolicy.removableDataTypes(
+                from: WKWebsiteDataStore.allWebsiteDataTypes()
+            )
+            guard !dataTypes.isEmpty else {
+                completionHandler()
+                return
             }
+            store.removeData(ofTypes: dataTypes, modifiedSince: .distantPast) {
+                Logger.log("[WebCacheCleaner] Volatile dashboard caches deleted")
+                completionHandler()
+            }
+        }
+        if Thread.isMainThread {
+            cleanup()
+        } else {
+            DispatchQueue.main.async(execute: cleanup)
         }
     }
 }
@@ -36,6 +42,23 @@ class ClashWebViewContoller: NSViewController {
     let minSize = NSSize(width: 920, height: 580)
 
     let effectView = NSVisualEffectView()
+
+    private static func bundledDashboardCompatibilityJS() -> String? {
+        guard let scriptURL = Bundle.main.url(
+            forResource: "clashfx-compat",
+            withExtension: "js",
+            subdirectory: "dashboard"
+        ) else {
+            Logger.log("[dashboard] compatibility script missing", level: .warning)
+            return nil
+        }
+        do {
+            return try String(contentsOf: scriptURL, encoding: .utf8)
+        } catch {
+            Logger.log("[dashboard] compatibility script unreadable: \(error)", level: .warning)
+            return nil
+        }
+    }
 
     private static let apiGuardJS: String = """
     (function() {
@@ -368,6 +391,14 @@ class ClashWebViewContoller: NSViewController {
             forMainFrameOnly: true
         )
         webview.configuration.userContentController.addUserScript(metaCubeXDConfigScript)
+        if let compatibilitySource = Self.bundledDashboardCompatibilityJS() {
+            let compatibilityScript = WKUserScript(
+                source: compatibilitySource,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+            webview.configuration.userContentController.addUserScript(compatibilityScript)
+        }
         webview.configuration.userContentController.addUserScript(guardScript)
         webview.configuration.userContentController.addUserScript(rulesSnapshotScript)
         webview.configuration.userContentController.addUserScript(hideScript)
@@ -420,11 +451,6 @@ class ClashWebViewContoller: NSViewController {
     }
 
     func loadWebRecourses() {
-        WKWebsiteDataStore.default().removeData(
-            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
-            modifiedSince: Date(timeIntervalSince1970: 0),
-            completionHandler: {}
-        )
         // defaults write com.clashfx.app webviewUrl "your url"
         if let userDefineUrl = UserDefaults.standard.string(forKey: "webviewUrl"), let url = URL(string: userDefineUrl) {
             Logger.log("get user define url: \(url)")

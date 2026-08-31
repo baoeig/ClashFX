@@ -26,6 +26,7 @@ class MenuItemFactory {
     static func recreateProxyMenuItems() {
         let recreate = {
             AutomaticGroupBenchmarkPresentationStore.clearAll()
+            AutomaticChildBenchmarkStore.clearAll()
             // Selector presentations reconcile against the new snapshot and are
             // pruned below. Clearing them here made valid results disappear on
             // no-op config reloads and menu reconstruction.
@@ -71,6 +72,7 @@ class MenuItemFactory {
         }
 
         AutomaticGroupBenchmarkPresentationStore.prune(using: info)
+        AutomaticChildBenchmarkStore.prune(using: info)
         SelectorBenchmarkPresentationStore.prune(using: info)
         let structure = ProxyMenuStructureSignature(snapshot: info)
         let previous = cachedProxyData
@@ -258,7 +260,7 @@ class MenuItemFactory {
         let selectedName = proxyGroup.now ?? ""
         for proxyName in proxyGroup.all ?? [] {
             guard let proxy = proxyInfo.proxiesMap[proxyName] else { continue }
-            let proxyMenuItem = ProxyMenuItem(proxy: proxy, group: proxyGroup, action: #selector(empty), simpleItem: true)
+            let proxyMenuItem = ProxyMenuItem(proxy: proxy, group: proxyGroup, action: #selector(empty))
             proxyMenuItem.target = MenuItemFactory.self
             if proxy.name == selectedName {
                 proxyMenuItem.state = .on
@@ -271,7 +273,11 @@ class MenuItemFactory {
                 )
             )
 
+            submenu.add(delegate: proxyMenuItem)
             submenu.addItem(proxyMenuItem)
+        }
+        if proxyGroup.isSpeedTestable && useViewToRenderProxy {
+            submenu.minimumWidth = proxyGroup.maxProxyNameLength + ProxyItemView.fixedPlaceHolderWidth
         }
         addSpeedTestMenuItem(submenu, proxyGroup: proxyGroup)
     }
